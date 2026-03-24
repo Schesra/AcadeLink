@@ -25,12 +25,12 @@
 * **Quản lý Khóa học của tôi**: Thêm, Sửa, Xóa khóa học do mình tạo.
 * **Quản lý Bài học**: Thêm, Sửa, Xóa bài học vào khóa học của mình.
 * **Quản lý Ghi danh**: Xem và duyệt học viên đăng ký khóa học của mình.
-* **Dashboard thống kê**: Xem số lượng học viên, doanh thu (optional).
+* **Dashboard thống kê**: Xem số lượng học viên, doanh thu.
 
 ### 3. Hệ thống Quản trị (Admin Dashboard)
 * **Xác thực Admin**: Đăng nhập trang quản trị với role = admin.
 * **Quản lý Danh mục (Category Management)**: Thêm, Sửa, Xóa danh mục khóa học.
-* **Quản lý Toàn bộ Khóa học**: Thêm, Sửa, Xóa tất cả khóa học trong hệ thống (bao gồm cả khóa học của Instructor).
+* **Quản lý Toàn bộ Khóa học**: Thêm, Sửa, Xóa tất cả khóa học trong hệ thống.
 * **Quản lý Toàn bộ Bài học**: Thêm, Sửa, Xóa tất cả bài học trong hệ thống.
 * **Quản lý Users**: Xem danh sách user, phân quyền role.
 * **Quản lý Toàn bộ Ghi danh**: Xem và duyệt tất cả enrollment trong hệ thống.
