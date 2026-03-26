@@ -59,24 +59,32 @@ Giao diện đăng nhập Admin:
 
 2. Validation: Email phải đúng định dạng, không được để trống các trường bắt buộc.
 
-3. Khi submit, thực hiện query: SELECT id, email, password FROM Users WHERE email = :email.
+3. Xác thực đăng nhập: Query database SELECT id, email, password_hash, full_name FROM Users WHERE email = :email.
 
-4. Sử dụng bcrypt.compare(password, hashedPassword) để xác thực mật khẩu.
+4. **Password verification phải sử dụng bcrypt.compare()**:
+   - Lấy password_hash từ database (đã được hash bằng bcrypt với salt rounds = 10)
+   - So sánh: bcrypt.compare(inputPassword, storedPasswordHash)
+   - Nếu true → Tiếp tục kiểm tra role
+   - Nếu false → Trả về lỗi 401 "Email hoặc mật khẩu không chính xác"
 
-5. Sau khi xác thực password thành công, query bảng UserRoles: SELECT role FROM UserRoles WHERE user_id = :user_id.
+5. KHÔNG BAO GIỜ so sánh plain text password trực tiếp (inputPassword === storedPassword là SAI).
 
-6. Kiểm tra roles array phải chứa 'admin'. Nếu không có role 'admin', trả về lỗi 403 với message "Bạn không có quyền truy cập trang quản trị."
+6. Sau khi xác thực password thành công, query bảng UserRoles: SELECT role FROM UserRoles WHERE user_id = :user_id.
 
-7. Nếu có role 'admin', tạo JWT token với payload: { user_id, email, roles: [...], exp: Date.now() + 7days }.
+7. Kiểm tra roles array phải chứa 'admin'. Nếu không có role 'admin', trả về lỗi 403 với message "Bạn không có quyền truy cập trang quản trị."
 
-8. Server trả về response: { token: "eyJhbGc...", user: { id, name, email, roles } }.
+8. Nếu có role 'admin', tạo JWT token với payload: { user_id, email, roles: [...], exp: Date.now() + 7days }.
 
-9. Client lưu token vào localStorage.setItem("admin_token", token).
+9. Server trả về response: { token: "eyJhbGc...", user: { id, name, email, roles } }.
 
-10. Sau khi đăng nhập thành công, chuyển hướng đến "/admin/dashboard".
+10. Client lưu token vào localStorage.setItem("admin_token", token).
 
-11. API endpoint: POST /api/admin/login với body { email, password }.
+11. Sau khi đăng nhập thành công, chuyển hướng đến "/admin/dashboard".
 
-12. Tất cả các route /admin/* phải có middleware kiểm tra: JWT token hợp lệ và roles.includes('admin'). Nếu không -> 401 hoặc 403.
+12. API endpoint: POST /api/admin/login với body { email, password }.
 
-13. Nếu Admin đã đăng nhập (có token hợp lệ), truy cập "/admin/login" phải tự động chuyển đến "/admin/dashboard".
+13. Tất cả các route /admin/* phải có middleware kiểm tra: JWT token hợp lệ và roles.includes('admin'). Nếu không -> 401 hoặc 403.
+
+14. Nếu Admin đã đăng nhập (có token hợp lệ), truy cập "/admin/login" phải tự động chuyển đến "/admin/dashboard".
+
+15. Nếu email không tồn tại trong database → Trả về lỗi 401 "Email hoặc mật khẩu không chính xác" (không tiết lộ email có tồn tại hay không để bảo mật).
