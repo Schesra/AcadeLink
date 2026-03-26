@@ -52,11 +52,25 @@ Giao diện trang danh sách khóa học:
 5. **Footer**: Giống trang chủ.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị tất cả**: Truy cập "/courses" -> Hiển thị toàn bộ khóa học trong hệ thống.
-* **Lọc theo danh mục**: Click vào danh mục "Lập trình" -> Chỉ hiển thị các khóa học thuộc danh mục "Lập trình".
-* **Số lượng khóa học**: Hiển thị đúng số lượng khóa học tìm thấy (VD: "Tìm thấy 12 khóa học").
-* **Click vào khóa học**: Click vào card -> Chuyển đến "/courses/:id".
-* **Không có khóa học**: Danh mục không có khóa học -> Hiển thị "Không tìm thấy khóa học nào".
-* **Bỏ filter**: Click "Tất cả" -> Hiển thị lại toàn bộ khóa học.
-* **Responsive**: Truy cập từ mobile -> Filter chuyển thành dropdown, grid layout 1 cột.
-* **Loading**: Đang tải dữ liệu -> Hiển thị loading spinner.
+
+1. Trang danh sách phải hiển thị tất cả khóa học trong hệ thống dưới dạng grid layout.
+
+2. Sidebar (PC) hoặc Dropdown (Mobile) phải hiển thị danh sách tất cả danh mục từ bảng Categories.
+
+3. Mỗi danh mục trong sidebar phải có thể click để lọc khóa học theo category_id.
+
+4. Phải có nút "Tất cả" để bỏ filter và hiển thị lại toàn bộ khóa học.
+
+5. Hiển thị số lượng khóa học tìm thấy dưới dạng text "Tìm thấy X khóa học".
+
+6. Mỗi card khóa học phải hiển thị: Thumbnail, Tên khóa học, Giá, Tên danh mục, Mô tả ngắn (2-3 dòng, tối đa 150 ký tự).
+
+7. Click vào card khóa học phải chuyển hướng đến "/courses/:id".
+
+8. Khi lọc theo danh mục, URL phải cập nhật thành "/courses?category=:category_id" để có thể bookmark và share.
+
+9. Nếu danh mục được chọn không có khóa học nào, hiển thị "Không tìm thấy khóa học nào trong danh mục này."
+
+10. API endpoint: GET /api/courses?category_id=:id (nếu có filter) hoặc GET /api/courses (tất cả).
+
+11. Giao diện phải responsive: grid 3-4 cột (PC), 2 cột (tablet), 1 cột (mobile).

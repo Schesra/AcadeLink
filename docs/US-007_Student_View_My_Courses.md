@@ -57,12 +57,27 @@ Giao diện "Khóa học của tôi":
 5. **Footer**: Giống các trang khác.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị danh sách**: Student đã đăng ký 3 khóa học -> Truy cập "/my-courses" -> Hiển thị 3 cards với đầy đủ thông tin.
-* **Trạng thái pending**: Khóa học có status = "pending" -> Hiển thị badge màu vàng "Chờ duyệt" -> Không có nút "Vào học".
-* **Trạng thái approved**: Khóa học có status = "approved" -> Hiển thị badge màu xanh "Đã duyệt" -> Có nút "Vào học".
-* **Trạng thái rejected**: Khóa học có status = "rejected" -> Hiển thị badge màu đỏ "Từ chối" -> Không có nút "Vào học".
-* **Click Vào học**: Click nút "Vào học" -> Chuyển đến "/courses/:id/learn".
-* **Chưa có khóa học**: Student chưa đăng ký khóa học nào -> Hiển thị empty state với button "Khám phá khóa học".
-* **Click Khám phá**: Click "Khám phá khóa học" -> Chuyển đến "/courses".
-* **Chưa đăng nhập**: Truy cập URL này khi chưa đăng nhập -> Chuyển hướng đến "/login".
-* **Responsive**: Truy cập từ mobile -> Grid layout 1 cột.
+
+1. Trang phải hiển thị danh sách các khóa học mà Student đã đăng ký, lấy từ query: SELECT c.*, e.status, e.created_at as enrolled_at FROM Courses c JOIN Enrollments e ON c.id = e.course_id WHERE e.student_id = :user_id ORDER BY e.created_at DESC.
+
+2. Mỗi card khóa học phải hiển thị: Thumbnail, Tên khóa học, Badge trạng thái (màu sắc khác nhau).
+
+3. Badge trạng thái phải hiển thị theo status:
+   - status = 'pending': Badge màu vàng/cam với text "Chờ duyệt"
+   - status = 'approved': Badge màu xanh với text "Đã duyệt"
+   - status = 'rejected': Badge màu đỏ với text "Từ chối"
+
+4. Nút "Vào học" chỉ hiển thị khi status = 'approved'. Click nút -> Chuyển đến "/courses/:id/learn".
+
+5. Nếu Student chưa đăng ký khóa học nào (query trả về empty), hiển thị empty state với:
+   - Icon hoặc illustration
+   - Text: "Bạn chưa đăng ký khóa học nào"
+   - Button "Khám phá khóa học" -> Link đến "/courses"
+
+6. API endpoint: GET /api/my-courses (yêu cầu JWT token trong header).
+
+7. Middleware phải verify JWT token và lấy user_id từ payload để query enrollments.
+
+8. Nếu user chưa đăng nhập (không có token hoặc token hết hạn), chuyển hướng đến "/login".
+
+9. Giao diện phải responsive: grid 2-3 cột (PC), 1 cột (mobile).

@@ -65,13 +65,33 @@ Giao diện quản lý ghi danh:
     * Nút "Xác nhận" và "Hủy".
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị danh sách**: Truy cập "/admin/enrollments" -> Hiển thị bảng với tất cả enrollment, đúng thông tin Học viên, Email, Khóa học, Trạng thái, Ngày đăng ký.
-* **Lọc theo trạng thái**: Click tab "Chờ duyệt" -> Chỉ hiển thị enrollment có status = "pending".
-* **Duyệt enrollment thành công**: Click "Duyệt" ở row enrollment pending -> Confirm dialog -> Click "Xác nhận" -> Cập nhật status = "approved" trong database -> Hiển thị thông báo "Duyệt thành công" -> Badge chuyển sang màu xanh "Đã duyệt" -> Actions biến mất.
-* **Từ chối enrollment thành công**: Click "Từ chối" ở row enrollment pending -> Confirm dialog -> Click "Xác nhận" -> Cập nhật status = "rejected" trong database -> Hiển thị thông báo "Đã từ chối" -> Badge chuyển sang màu đỏ "Từ chối" -> Actions biến mất.
-* **Hủy duyệt/từ chối**: Click "Duyệt" hoặc "Từ chối" -> Confirm dialog -> Click "Hủy" -> Không cập nhật status.
-* **Enrollment đã duyệt**: Row có status = "approved" -> Không hiển thị actions, chỉ hiển thị badge "Đã duyệt".
-* **Enrollment đã từ chối**: Row có status = "rejected" -> Không hiển thị actions, chỉ hiển thị badge "Từ chối".
-* **Không có enrollment**: Chưa có enrollment nào trong hệ thống -> Hiển thị "Chưa có yêu cầu ghi danh nào."
-* **Không có quyền**: User với role = "student" truy cập URL này -> Chuyển hướng hoặc hiển thị lỗi 403.
-* **Student được vào học**: Sau khi Admin duyệt enrollment -> Student truy cập "/courses/:id/learn" -> Có thể xem nội dung bài học.
+
+1. Trang phải hiển thị bảng với tất cả enrollment, query: SELECT e.*, u.name as student_name, u.email, c.title as course_title FROM Enrollments e JOIN Users u ON e.student_id = u.id JOIN Courses c ON e.course_id = c.id ORDER BY e.created_at DESC.
+
+2. Bảng phải có các cột: ID, Học viên, Email, Khóa học, Trạng thái (badge), Ngày đăng ký, Thao tác.
+
+3. Phải có tabs để lọc theo trạng thái: "Tất cả", "Chờ duyệt" (pending), "Đã duyệt" (approved), "Từ chối" (rejected).
+
+4. Click tab "Chờ duyệt" -> Query: WHERE status = 'pending'.
+
+5. Badge trạng thái phải có màu sắc:
+   - pending: background vàng/cam, text "Chờ duyệt"
+   - approved: background xanh, text "Đã duyệt"
+   - rejected: background đỏ, text "Từ chối"
+
+6. Cột "Thao tác" chỉ hiển thị nút "Duyệt" và "Từ chối" khi status = 'pending'.
+
+7. Nút "Duyệt" phải hiển thị confirm dialog: "Bạn có chắc muốn duyệt yêu cầu ghi danh này?"
+
+8. Khi duyệt: UPDATE Enrollments SET status = 'approved', updated_at = NOW() WHERE id = :id. API: PUT /api/admin/enrollments/:id/approve.
+
+9. Nút "Từ chối" phải hiển thị confirm dialog: "Bạn có chắc muốn từ chối yêu cầu ghi danh này?"
+
+10. Khi từ chối: UPDATE Enrollments SET status = 'rejected', updated_at = NOW() WHERE id = :id. API: PUT /api/admin/enrollments/:id/reject.
+
+11. Sau khi cập nhật status thành công, badge phải tự động cập nhật màu sắc và text, nút "Duyệt"/"Từ chối" phải biến mất.
+
+12. Nếu chưa có enrollment nào, hiển thị empty state: "Chưa có yêu cầu ghi danh nào."
+
+13. Tất cả API endpoints phải yêu cầu JWT token với role 'admin'.
+

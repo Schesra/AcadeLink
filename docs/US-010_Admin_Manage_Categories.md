@@ -58,10 +58,27 @@ Giao diện quản lý danh mục:
     * Nút "Xác nhận" và "Hủy".
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị danh sách**: Truy cập "/admin/categories" -> Hiển thị bảng với tất cả danh mục, đúng thông tin ID, Tên, Số khóa học.
-* **Thêm danh mục thành công**: Click "Thêm danh mục mới" -> Nhập tên "Lập trình" -> Click "Lưu" -> Tạo record mới trong database -> Hiển thị thông báo "Thêm danh mục thành công" -> Danh sách cập nhật với danh mục mới.
-* **Thêm danh mục thất bại**: Để trống tên danh mục -> Click "Lưu" -> Hiển thị lỗi "Tên danh mục không được bỏ trống".
-* **Sửa danh mục thành công**: Click "Sửa" ở row danh mục "Lập trình" -> Form load với tên "Lập trình" -> Sửa thành "Lập trình Web" -> Click "Lưu" -> Cập nhật database -> Hiển thị thông báo "Cập nhật thành công" -> Bảng cập nhật tên mới.
-* **Xóa danh mục thành công**: Click "Xóa" ở row danh mục "Test" -> Hiển thị confirm dialog -> Click "Xác nhận" -> Xóa khỏi database -> Hiển thị thông báo "Xóa thành công" -> Danh mục biến mất khỏi bảng.
-* **Hủy xóa**: Click "Xóa" -> Hiển thị confirm dialog -> Click "Hủy" -> Không xóa, dialog đóng.
-* **Không có quyền**: User với role = "student" truy cập URL này -> Chuyển hướng đến trang chủ hoặc hiển thị lỗi 403.
+
+1. Trang phải hiển thị bảng (table) với tất cả danh mục, query: SELECT id, category_name, (SELECT COUNT(*) FROM Courses WHERE category_id = Categories.id) as course_count FROM Categories ORDER BY id DESC.
+
+2. Bảng phải có các cột: ID, Tên danh mục, Số khóa học, Thao tác (Actions).
+
+3. Nút "Thêm danh mục mới" phải mở modal hoặc form với trường: Tên danh mục (text, required).
+
+4. Validation: Tên danh mục không được để trống, tối thiểu 2 ký tự, tối đa 255 ký tự.
+
+5. Khi thêm danh mục, thực hiện: INSERT INTO Categories (category_name, created_at) VALUES (:name, NOW()). API: POST /api/admin/categories với body { category_name }.
+
+6. Nút "Sửa" phải load thông tin danh mục hiện tại vào form: SELECT * FROM Categories WHERE id = :id.
+
+7. Khi sửa danh mục, thực hiện: UPDATE Categories SET category_name = :name, updated_at = NOW() WHERE id = :id. API: PUT /api/admin/categories/:id với body { category_name }.
+
+8. Nút "Xóa" phải hiển thị confirm dialog với text: "Bạn có chắc muốn xóa danh mục '[Tên danh mục]'?"
+
+9. Khi xóa, thực hiện: DELETE FROM Categories WHERE id = :id. API: DELETE /api/admin/categories/:id.
+
+10. Nếu danh mục có khóa học (course_count > 0), có thể hiển thị cảnh báo trong confirm dialog: "Danh mục này có X khóa học. Bạn có chắc muốn xóa?"
+
+11. Sau mỗi thao tác (thêm/sửa/xóa) thành công, hiển thị toast notification và refresh danh sách.
+
+12. Tất cả API endpoints phải yêu cầu JWT token với role 'admin'.

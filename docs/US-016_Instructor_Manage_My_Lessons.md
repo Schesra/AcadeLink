@@ -58,11 +58,38 @@ Giao diện quản lý bài học:
 7. **Delete Confirmation Dialog**.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị danh sách**: Truy cập trang -> Hiển thị chỉ bài học của các khóa học có instructor_id = current user.
-* **Thêm bài học thành công**: Chọn khóa học của mình -> Điền thông tin -> Click "Lưu" -> Tạo record -> Thông báo thành công.
-* **Thêm bài học thất bại**: Bỏ trống trường bắt buộc hoặc thứ tự <= 0 -> Hiển thị lỗi.
-* **Sửa bài học thành công**: Click "Sửa" -> Form load -> Sửa -> Lưu -> Cập nhật -> Thông báo thành công.
-* **Xóa bài học thành công**: Click "Xóa" -> Confirm -> Xóa -> Thông báo thành công.
-* **Dropdown khóa học**: Chỉ hiển thị khóa học có instructor_id = current user.
-* **Không có quyền**: User không có role instructor -> Chuyển hướng hoặc lỗi 403.
-* **Không thấy bài học của người khác**: Instructor A không thấy bài học của khóa học do Instructor B tạo.
+
+1. Trang phải hiển thị bảng với các bài học thuộc khóa học do Instructor tạo, query: SELECT l.*, c.title as course_title FROM Lessons l JOIN Courses c ON l.course_id = c.id WHERE c.instructor_id = :user_id ORDER BY c.id, l.order ASC.
+
+2. Bảng phải có các cột: ID, Tên bài học, Khóa học, Thứ tự, Thao tác.
+
+3. Hiển thị tổng số bài học: "Bạn có X bài học".
+
+4. Nút "Thêm bài học mới" phải mở form với các trường:
+   - Khóa học (select dropdown, required) - Load từ: SELECT id, title FROM Courses WHERE instructor_id = :user_id ORDER BY title
+   - Tên bài học (text, required, max 255 chars)
+   - Video URL (text, optional, URL format)
+   - Nội dung (textarea, optional)
+   - Thứ tự (number, required, min 1)
+
+5. Validation: Tên bài học và Khóa học bắt buộc không được để trống, Thứ tự phải >= 1, Video URL (nếu có) phải là URL hợp lệ.
+
+6. Khi tạo bài học: INSERT INTO Lessons (course_id, title, video_url, content, order, created_at) VALUES (:course_id, :title, :video_url, :content, :order, NOW()). API: POST /api/instructor/lessons.
+
+7. Phải validate course_id thuộc về Instructor: SELECT id FROM Courses WHERE id = :course_id AND instructor_id = :user_id. Nếu không tìm thấy -> Lỗi 403 "Bạn không có quyền thêm bài học vào khóa học này".
+
+8. Nút "Sửa" chỉ hiển thị cho bài học thuộc khóa học của Instructor. Load thông tin: SELECT l.* FROM Lessons l JOIN Courses c ON l.course_id = c.id WHERE l.id = :id AND c.instructor_id = :user_id.
+
+9. Khi sửa: UPDATE Lessons SET course_id = :course_id, title = :title, video_url = :video_url, content = :content, order = :order, updated_at = NOW() WHERE id = :id AND course_id IN (SELECT id FROM Courses WHERE instructor_id = :user_id). API: PUT /api/instructor/lessons/:id.
+
+10. Nút "Xóa" phải hiển thị confirm dialog: "Bạn có chắc muốn xóa bài học '[Tên]'?"
+
+11. Khi xóa: DELETE FROM Lessons WHERE id = :id AND course_id IN (SELECT id FROM Courses WHERE instructor_id = :user_id). API: DELETE /api/instructor/lessons/:id.
+
+12. Instructor không được thấy hoặc sửa bài học của khóa học do Instructor khác tạo (WHERE c.instructor_id = :user_id trong mọi query).
+
+13. API endpoints phải yêu cầu JWT token với role 'instructor'.
+
+14. Dropdown "Khóa học" trong form chỉ hiển thị khóa học có instructor_id = user_id từ JWT token payload.
+
+15. Nếu Instructor chưa có khóa học nào, hiển thị thông báo: "Bạn chưa có khóa học nào. Vui lòng tạo khóa học trước khi thêm bài học." và ẩn nút "Thêm bài học mới".

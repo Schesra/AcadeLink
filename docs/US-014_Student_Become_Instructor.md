@@ -52,8 +52,23 @@ Giao diện đăng ký trở thành giảng viên:
 5. **Footer**: Giống các trang khác.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Thành công**: Student chưa có role instructor -> Điền form (hoặc bỏ qua) -> Click "Đăng ký ngay" -> Thêm record vào bảng UserRoles (user_id, role="instructor") -> Hiển thị thông báo "Chúc mừng! Bạn đã trở thành giảng viên" -> Header hiển thị thêm link "Instructor Dashboard".
-* **Đã là Instructor**: Student đã có role instructor -> Truy cập trang này -> Hiển thị thông báo "Bạn đã là giảng viên" -> Chuyển đến "/instructor/dashboard".
-* **Chưa đăng nhập**: Truy cập trang này khi chưa đăng nhập -> Chuyển hướng đến "/login".
-* **Switch mode**: Sau khi có role instructor -> Header có dropdown để switch giữa "Student" và "Instructor" mode.
-* **Instructor Dashboard**: Click "Instructor Dashboard" -> Chuyển đến "/instructor/dashboard" với menu quản lý khóa học, bài học, enrollment.
+
+1. Trang phải hiển thị form hoặc button "Đăng ký trở thành giảng viên" với các trường optional: Lý do (textarea), Kinh nghiệm (textarea).
+
+2. Trước khi hiển thị form, kiểm tra user đã có role 'instructor' chưa: SELECT role FROM UserRoles WHERE user_id = :user_id AND role = 'instructor'.
+
+3. Nếu đã có role 'instructor', hiển thị thông báo "Bạn đã là giảng viên rồi" và chuyển hướng đến "/instructor/dashboard".
+
+4. Khi submit form, thực hiện: INSERT INTO UserRoles (user_id, role, created_at) VALUES (:user_id, 'instructor', NOW()). API: POST /api/become-instructor.
+
+5. Sau khi thêm role thành công, hiển thị thông báo "Chúc mừng! Bạn đã trở thành giảng viên".
+
+6. Header phải tự động cập nhật để hiển thị thêm link "Instructor Dashboard" trong dropdown menu user.
+
+7. User phải có thể switch giữa Student mode và Instructor mode thông qua dropdown menu.
+
+8. API endpoint phải yêu cầu JWT token với role 'student' (user đã đăng nhập).
+
+9. Nếu user chưa đăng nhập, chuyển hướng đến "/login".
+
+10. Sau khi trở thành Instructor, user vẫn giữ role 'student' (multi-role system).

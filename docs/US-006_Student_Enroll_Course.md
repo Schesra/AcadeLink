@@ -56,10 +56,23 @@ Giao diện form đăng ký khóa học:
 5. **Footer**: Giống các trang khác.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Thành công**: Điền đầy đủ thông tin hợp lệ -> Click "Xác nhận đăng ký" -> Tạo record trong bảng Enrollments (user_id, course_id, status="pending", created_at) -> Hiển thị thông báo "Đăng ký thành công! Vui lòng chờ Admin duyệt." -> Chuyển đến "/my-courses".
-* **Đã đăng ký trước đó**: Student đã có enrollment cho khóa học này -> Hiển thị lỗi "Bạn đã đăng ký khóa học này rồi" và không cho submit.
-* **Bỏ trống trường bắt buộc**: Để trống Họ tên, Email hoặc Số điện thoại -> Hiển thị lỗi "Vui lòng điền đầy đủ thông tin".
-* **Số điện thoại không hợp lệ**: Nhập số điện thoại sai định dạng -> Hiển thị lỗi "Số điện thoại không hợp lệ".
-* **Email không hợp lệ**: Nhập email sai định dạng -> Hiển thị lỗi "Email không hợp lệ".
-* **Hủy**: Click "Hủy" -> Quay lại trang chi tiết khóa học "/courses/:id".
-* **Chưa đăng nhập**: Nếu chưa đăng nhập mà truy cập URL này -> Chuyển hướng đến trang đăng nhập.
+
+1. Form đăng ký khóa học phải hiển thị thông tin khóa học: Thumbnail nhỏ, Tên khóa học, Giá.
+
+2. Form phải bao gồm các trường: Họ và tên (text, required), Email (email, required), Số điện thoại (tel, required), Ghi chú (textarea, optional).
+
+3. Trường "Họ và tên" và "Email" phải được tự động điền sẵn từ thông tin user đã đăng nhập (lấy từ JWT token payload hoặc API GET /api/users/me).
+
+4. Validation: Họ tên không được để trống, Email phải đúng định dạng, Số điện thoại phải có 10-11 chữ số.
+
+5. Trước khi submit, phải kiểm tra xem Student đã đăng ký khóa học này chưa: SELECT * FROM Enrollments WHERE student_id = :user_id AND course_id = :course_id. Nếu đã tồn tại -> Hiển thị lỗi "Bạn đã đăng ký khóa học này rồi" và không cho submit.
+
+6. Khi submit thành công, thực hiện INSERT INTO Enrollments (student_id, course_id, status, created_at) VALUES (:user_id, :course_id, 'pending', NOW()).
+
+7. Sau khi tạo enrollment thành công, hiển thị thông báo "Đăng ký thành công! Vui lòng chờ Admin/Instructor duyệt." và chuyển hướng đến "/my-courses".
+
+8. API endpoint: POST /api/enrollments với body { course_id, phone, note }.
+
+9. Nút "Hủy" phải chuyển hướng về trang chi tiết khóa học "/courses/:id".
+
+10. Nếu user chưa đăng nhập (không có JWT token), tự động chuyển hướng đến "/login".

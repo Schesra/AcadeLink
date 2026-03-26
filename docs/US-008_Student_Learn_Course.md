@@ -62,13 +62,31 @@ Giao diện trang học khóa học:
     * Mobile: Sidebar có thể toggle, main content chiếm full width khi sidebar ẩn.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Truy cập thành công**: Student có enrollment approved -> Truy cập "/courses/:id/learn" -> Hiển thị trang học với sidebar và nội dung bài học đầu tiên.
-* **Chưa đăng ký**: Student chưa đăng ký khóa học -> Truy cập URL này -> Chuyển hướng đến "/courses/:id" với thông báo lỗi.
-* **Chờ duyệt**: Student có enrollment pending -> Truy cập URL này -> Hiển thị thông báo "Đăng ký đang chờ duyệt" và không cho xem nội dung.
-* **Bị từ chối**: Student có enrollment rejected -> Hiển thị thông báo "Đăng ký đã bị từ chối".
-* **Click bài học**: Click vào bài học thứ 3 trong sidebar -> Nội dung main content chuyển sang bài học thứ 3 -> Bài học thứ 3 được highlight trong sidebar.
-* **Hiển thị video**: Bài học có video_url -> Hiển thị video player với video từ URL đó.
-* **Hiển thị text**: Bài học có content -> Hiển thị nội dung text dưới video (hoặc thay video nếu không có video).
-* **Quay lại**: Click "Quay lại" -> Chuyển đến "/my-courses".
-* **Chưa đăng nhập**: Truy cập URL này khi chưa đăng nhập -> Chuyển hướng đến "/login".
-* **Responsive**: Truy cập từ mobile -> Sidebar có thể toggle, main content responsive.
+
+1. Trước khi hiển thị nội dung, phải kiểm tra quyền truy cập: SELECT status FROM Enrollments WHERE student_id = :user_id AND course_id = :course_id. Chỉ cho phép truy cập nếu status = 'approved'.
+
+2. Nếu enrollment không tồn tại, chuyển hướng đến "/courses/:id" với thông báo "Bạn chưa đăng ký khóa học này."
+
+3. Nếu status = 'pending', hiển thị thông báo "Đăng ký của bạn đang chờ duyệt. Vui lòng quay lại sau." và không cho xem nội dung.
+
+4. Nếu status = 'rejected', hiển thị thông báo "Đăng ký của bạn đã bị từ chối." và không cho xem nội dung.
+
+5. Layout phải có 2 phần: Sidebar bên trái (30% width) và Main content bên phải (70% width).
+
+6. Sidebar phải hiển thị danh sách tất cả bài học của khóa học, query: SELECT * FROM Lessons WHERE course_id = :course_id ORDER BY order ASC.
+
+7. Mỗi bài học trong sidebar hiển thị: Số thứ tự (order), Tên bài học. Bài học đang xem phải được highlight (background color khác).
+
+8. Mặc định khi vào trang, hiển thị bài học đầu tiên (order = 1 hoặc MIN(order)).
+
+9. Main content phải hiển thị: Tên bài học (H2), Video player (nếu video_url không NULL), Nội dung text (nếu content không NULL).
+
+10. Video player: Nếu video_url là YouTube link -> Dùng iframe embed. Nếu là direct video URL -> Dùng HTML5 <video> tag.
+
+11. Click vào bài học trong sidebar phải cập nhật URL thành "/courses/:id/learn?lesson=:lesson_id" và load nội dung bài học đó.
+
+12. Nút "Quay lại" phải chuyển hướng về "/my-courses".
+
+13. Trên mobile, sidebar phải có thể toggle (ẩn/hiện) bằng button hamburger menu.
+
+14. API endpoint: GET /api/courses/:id/lessons (yêu cầu JWT token, kiểm tra enrollment approved).

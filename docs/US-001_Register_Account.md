@@ -52,9 +52,23 @@ Giao diện đăng ký bao gồm:
 2. **Responsive**: Form hiển thị tốt trên cả PC và Mobile.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Thành công**: Nhập đầy đủ thông tin hợp lệ -> Tạo tài khoản thành công -> Hiển thị thông báo "Đăng ký thành công!" -> Chuyển hướng đến trang đăng nhập.
-* **Email đã tồn tại**: Nhập email đã được đăng ký -> Hiển thị lỗi "Email này đã được đăng ký".
-* **Email không hợp lệ**: Nhập email sai định dạng -> Hiển thị lỗi "Email không hợp lệ".
-* **Mật khẩu không khớp**: Mật khẩu và Xác nhận mật khẩu khác nhau -> Hiển thị lỗi "Mật khẩu xác nhận không khớp".
-* **Bỏ trống trường bắt buộc**: Để trống bất kỳ trường nào -> Hiển thị lỗi "Vui lòng điền đầy đủ thông tin".
-* **Mật khẩu quá ngắn**: Nhập mật khẩu < 6 ký tự -> Hiển thị lỗi "Mật khẩu phải có ít nhất 6 ký tự".
+
+1. Form đăng ký phải bao gồm các trường: Họ và tên, Email, Mật khẩu, Xác nhận mật khẩu.
+
+2. Tất cả các trường đều bắt buộc phải nhập (required), không được để trống.
+
+3. Email phải đúng định dạng (có @ và domain hợp lệ).
+
+4. Mật khẩu phải có tối thiểu 6 ký tự.
+
+5. Trường "Xác nhận mật khẩu" phải khớp với trường "Mật khẩu".
+
+6. Hệ thống phải kiểm tra email đã tồn tại trong database trước khi tạo tài khoản.
+
+7. **Mật khẩu phải được hash bằng thuật toán bcrypt** với salt rounds = 10 trước khi lưu vào database. Không được lưu mật khẩu dạng plain text.
+
+8. Khi tạo tài khoản thành công, hệ thống tự động tạo record trong bảng UserRoles với role = "student".
+
+9. Sau khi đăng ký thành công, hiển thị thông báo "Đăng ký thành công!" và chuyển hướng đến trang đăng nhập.
+
+10. Các trường bắt buộc không được để trống (Data Validation).

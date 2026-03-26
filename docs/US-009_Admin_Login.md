@@ -54,10 +54,29 @@ Giao diện đăng nhập Admin:
 3. **Styling**: Có thể khác biệt với trang đăng nhập Student để phân biệt rõ ràng.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Thành công**: Nhập đúng email và mật khẩu của Admin -> Kiểm tra role = "admin" -> Tạo JWT token -> Lưu token -> Chuyển hướng đến "/admin/dashboard".
-* **Sai thông tin**: Nhập sai email hoặc mật khẩu -> Hiển thị lỗi "Email hoặc mật khẩu không chính xác."
-* **Không có quyền**: Đăng nhập bằng tài khoản Student (role = "student") -> Hiển thị lỗi "Bạn không có quyền truy cập trang quản trị."
-* **Bỏ trống**: Để trống email hoặc mật khẩu -> Hiển thị lỗi "Vui lòng điền đầy đủ thông tin."
-* **Token hết hạn**: Khi token hết hạn -> Tự động đăng xuất và chuyển về "/admin/login".
-* **Đã đăng nhập**: Nếu Admin đã đăng nhập (có token hợp lệ) -> Truy cập "/admin/login" -> Tự động chuyển đến "/admin/dashboard".
-* **Bảo vệ route**: Truy cập bất kỳ trang admin nào (/admin/*) khi chưa đăng nhập hoặc không có quyền -> Chuyển hướng đến "/admin/login".
+
+1. Form đăng nhập Admin phải bao gồm các trường: Email (email, required) và Mật khẩu (password, required).
+
+2. Validation: Email phải đúng định dạng, không được để trống các trường bắt buộc.
+
+3. Khi submit, thực hiện query: SELECT id, email, password FROM Users WHERE email = :email.
+
+4. Sử dụng bcrypt.compare(password, hashedPassword) để xác thực mật khẩu.
+
+5. Sau khi xác thực password thành công, query bảng UserRoles: SELECT role FROM UserRoles WHERE user_id = :user_id.
+
+6. Kiểm tra roles array phải chứa 'admin'. Nếu không có role 'admin', trả về lỗi 403 với message "Bạn không có quyền truy cập trang quản trị."
+
+7. Nếu có role 'admin', tạo JWT token với payload: { user_id, email, roles: [...], exp: Date.now() + 7days }.
+
+8. Server trả về response: { token: "eyJhbGc...", user: { id, name, email, roles } }.
+
+9. Client lưu token vào localStorage.setItem("admin_token", token).
+
+10. Sau khi đăng nhập thành công, chuyển hướng đến "/admin/dashboard".
+
+11. API endpoint: POST /api/admin/login với body { email, password }.
+
+12. Tất cả các route /admin/* phải có middleware kiểm tra: JWT token hợp lệ và roles.includes('admin'). Nếu không -> 401 hoặc 403.
+
+13. Nếu Admin đã đăng nhập (có token hợp lệ), truy cập "/admin/login" phải tự động chuyển đến "/admin/dashboard".

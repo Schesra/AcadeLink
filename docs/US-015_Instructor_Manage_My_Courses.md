@@ -61,10 +61,34 @@ Giao diện quản lý khóa học của Instructor:
     * Nút "Xác nhận" và "Hủy".
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị danh sách**: Truy cập "/instructor/courses" -> Hiển thị chỉ các khóa học có instructor_id = current user.
-* **Tạo khóa học thành công**: Click "Tạo khóa học mới" -> Điền đầy đủ thông tin -> Click "Lưu" -> Tạo record với instructor_id = current user -> Hiển thị thông báo "Tạo khóa học thành công" -> Danh sách cập nhật.
-* **Tạo khóa học thất bại**: Bỏ trống trường hoặc giá < 0 -> Hiển thị lỗi tương ứng.
-* **Sửa khóa học thành công**: Click "Sửa" -> Form load thông tin -> Sửa -> Click "Lưu" -> Cập nhật database -> Thông báo thành công.
-* **Xóa khóa học thành công**: Click "Xóa" -> Confirm -> Xóa khóa học và các bài học, enrollment liên quan -> Thông báo thành công.
-* **Không có quyền**: User không có role instructor -> Truy cập URL này -> Chuyển hướng hoặc lỗi 403.
-* **Không thấy khóa học của người khác**: Instructor A không thấy khóa học của Instructor B trong danh sách.
+
+1. Trang phải hiển thị bảng với các khóa học do Instructor tạo, query: SELECT c.*, cat.category_name, (SELECT COUNT(*) FROM Enrollments WHERE course_id = c.id) as student_count FROM Courses c JOIN Categories cat ON c.category_id = cat.id WHERE c.instructor_id = :user_id ORDER BY c.created_at DESC.
+
+2. Bảng phải có các cột: ID, Thumbnail, Tên khóa học, Giá, Danh mục, Số học viên, Thao tác.
+
+3. Hiển thị tổng số khóa học: "Bạn có X khóa học".
+
+4. Nút "Tạo khóa học mới" phải mở form với các trường:
+   - Tên khóa học (text, required, max 255 chars)
+   - Giá (number, required, min 0)
+   - Mô tả (textarea, required)
+   - Thumbnail URL (text, required, URL format)
+   - Danh mục (select dropdown, required) - Load từ: SELECT id, category_name FROM Categories
+
+5. Validation: Tất cả trường bắt buộc không được để trống, giá >= 0, thumbnail_url phải là URL hợp lệ.
+
+6. Khi tạo khóa học: INSERT INTO Courses (instructor_id, category_id, title, price, description, thumbnail_url, created_at) VALUES (:user_id, :category_id, :title, :price, :description, :thumbnail_url, NOW()). API: POST /api/instructor/courses.
+
+7. instructor_id phải tự động được set = user_id từ JWT token payload.
+
+8. Nút "Sửa" chỉ hiển thị cho khóa học có instructor_id = user_id. Load thông tin: SELECT * FROM Courses WHERE id = :id AND instructor_id = :user_id.
+
+9. Khi sửa: UPDATE Courses SET category_id = :category_id, title = :title, price = :price, description = :description, thumbnail_url = :thumbnail_url, updated_at = NOW() WHERE id = :id AND instructor_id = :user_id. API: PUT /api/instructor/courses/:id.
+
+10. Nút "Xóa" phải hiển thị confirm dialog: "Bạn có chắc muốn xóa khóa học '[Tên]'? Tất cả bài học và enrollment sẽ bị xóa."
+
+11. Khi xóa: DELETE FROM Courses WHERE id = :id AND instructor_id = :user_id. API: DELETE /api/instructor/courses/:id.
+
+12. Instructor không được thấy hoặc sửa khóa học của Instructor khác (WHERE instructor_id = :user_id trong mọi query).
+
+13. API endpoints phải yêu cầu JWT token với role 'instructor'.

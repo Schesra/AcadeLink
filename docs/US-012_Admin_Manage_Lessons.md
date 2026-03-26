@@ -71,12 +71,32 @@ Giao diện quản lý bài học:
     * Nút "Xác nhận" và "Hủy".
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị danh sách**: Truy cập "/admin/lessons" -> Hiển thị bảng với tất cả bài học trong hệ thống.
-* **Thêm bài học thành công**: Click "Thêm bài học mới" -> Chọn bất kỳ khóa học nào, nhập tên "Bài 1: Giới thiệu", video URL, thứ tự 1 -> Click "Lưu" -> Tạo record mới -> Hiển thị thông báo "Thêm bài học thành công" -> Danh sách cập nhật.
-* **Thêm bài học thất bại - Bỏ trống**: Để trống Tên bài học hoặc không chọn Khóa học -> Click "Lưu" -> Hiển thị lỗi "Vui lòng điền đầy đủ thông tin bắt buộc."
-* **Thêm bài học thất bại - Thứ tự không hợp lệ**: Nhập thứ tự = 0 hoặc âm -> Click "Lưu" -> Hiển thị lỗi "Thứ tự phải là số dương."
-* **Sửa bài học thành công**: Click "Sửa" ở row bài học -> Form load với thông tin hiện tại -> Sửa tên và video URL -> Click "Lưu" -> Cập nhật database -> Hiển thị thông báo "Cập nhật thành công" -> Bảng cập nhật thông tin mới.
-* **Xóa bài học thành công**: Click "Xóa" -> Confirm dialog -> Click "Xác nhận" -> Xóa khỏi database -> Hiển thị thông báo "Xóa thành công" -> Bài học biến mất khỏi bảng.
-* **Hủy xóa**: Click "Xóa" -> Confirm dialog -> Click "Hủy" -> Không xóa.
-* **Dropdown khóa học**: Form thêm/sửa -> Dropdown khóa học hiển thị tất cả khóa học trong hệ thống.
-* **Không có quyền**: User không có role admin -> Truy cập URL này -> Chuyển hướng hoặc hiển thị lỗi 403.
+
+1. Trang phải hiển thị bảng với tất cả bài học, query: SELECT l.*, c.title as course_title FROM Lessons l JOIN Courses c ON l.course_id = c.id ORDER BY l.created_at DESC.
+
+2. Bảng phải có các cột: ID, Tên bài học, Khóa học, Thứ tự (order), Thao tác.
+
+3. Nút "Thêm bài học mới" phải mở form với các trường:
+   - Khóa học (select dropdown, required) - Load từ: SELECT id, title FROM Courses ORDER BY title ASC
+   - Tên bài học (text, required, max 255 chars)
+   - Video URL (text, optional, URL format)
+   - Nội dung (textarea, optional)
+   - Thứ tự (number, required, min 1)
+
+4. Validation: Tên bài học và Khóa học không được để trống, Thứ tự phải là số nguyên >= 1.
+
+5. Khi thêm bài học: INSERT INTO Lessons (course_id, title, video_url, content, order, created_at) VALUES (:course_id, :title, :video_url, :content, :order, NOW()). API: POST /api/admin/lessons.
+
+6. Nút "Sửa" phải load thông tin bài học: SELECT * FROM Lessons WHERE id = :id.
+
+7. Khi sửa bài học: UPDATE Lessons SET course_id = :course_id, title = :title, video_url = :video_url, content = :content, order = :order, updated_at = NOW() WHERE id = :id. API: PUT /api/admin/lessons/:id.
+
+8. Admin có thể thay đổi course_id (chuyển bài học sang khóa học khác).
+
+9. Nút "Xóa" phải hiển thị confirm dialog: "Bạn có chắc muốn xóa bài học '[Tên bài học]'?"
+
+10. Khi xóa: DELETE FROM Lessons WHERE id = :id. API: DELETE /api/admin/lessons/:id.
+
+11. Dropdown "Khóa học" phải hiển thị tất cả khóa học trong hệ thống (không giới hạn theo instructor).
+
+12. Tất cả API endpoints phải yêu cầu JWT token với role 'admin'.

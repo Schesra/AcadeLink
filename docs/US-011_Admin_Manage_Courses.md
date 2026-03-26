@@ -74,13 +74,35 @@ Giao diện quản lý khóa học:
     * Nút "Xác nhận" và "Hủy".
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị danh sách**: Truy cập "/admin/courses" -> Hiển thị bảng với tất cả khóa học trong hệ thống.
-* **Tìm kiếm**: Nhập tên khóa học vào ô tìm kiếm -> Danh sách lọc theo tên.
-* **Lọc theo Instructor**: Chọn Instructor từ dropdown -> Chỉ hiển thị khóa học của Instructor đó.
-* **Thêm khóa học thành công**: Click "Thêm khóa học mới" -> Điền đầy đủ thông tin và chọn Instructor -> Click "Lưu" -> Tạo record với instructor_id = Instructor đã chọn -> Hiển thị thông báo "Thêm khóa học thành công" -> Danh sách cập nhật.
-* **Thêm khóa học thất bại**: Bỏ trống trường hoặc giá < 0 -> Hiển thị lỗi tương ứng.
-* **Sửa khóa học thành công**: Click "Sửa" -> Form load với thông tin hiện tại -> Có thể sửa tất cả thông tin (bao gồm cả thay đổi Instructor) -> Click "Lưu" -> Cập nhật database -> Hiển thị thông báo "Cập nhật thành công" -> Bảng cập nhật.
-* **Xóa khóa học thành công**: Click "Xóa" -> Confirm dialog với cảnh báo -> Click "Xác nhận" -> Xóa khóa học và dữ liệu liên quan -> Hiển thị thông báo "Xóa thành công" -> Khóa học biến mất.
-* **Hủy xóa**: Click "Xóa" -> Confirm dialog -> Click "Hủy" -> Không xóa.
-* **Dropdown Instructor**: Form thêm/sửa -> Dropdown Giảng viên hiển thị tất cả users có role instructor.
-* **Không có quyền**: User không có role admin -> Truy cập URL này -> Chuyển hướng hoặc hiển thị lỗi 403.
+
+1. Trang phải hiển thị bảng với tất cả khóa học, query: SELECT c.*, cat.category_name, u.name as instructor_name, (SELECT COUNT(*) FROM Enrollments WHERE course_id = c.id) as student_count FROM Courses c JOIN Categories cat ON c.category_id = cat.id JOIN Users u ON c.instructor_id = u.id ORDER BY c.created_at DESC.
+
+2. Bảng phải có các cột: ID, Thumbnail (ảnh 50x50px), Tên khóa học, Giá, Danh mục, Giảng viên, Số học viên, Thao tác.
+
+3. Phải có ô tìm kiếm (search input) để lọc khóa học theo tên: WHERE title LIKE '%:keyword%'.
+
+4. Phải có dropdown lọc theo Instructor: WHERE instructor_id = :instructor_id.
+
+5. Nút "Thêm khóa học mới" phải mở form với các trường:
+   - Tên khóa học (text, required, max 255 chars)
+   - Giá (number, required, min 0)
+   - Mô tả (textarea, required)
+   - Thumbnail URL (text, required, URL format)
+   - Danh mục (select dropdown, required) - Load từ: SELECT id, category_name FROM Categories
+   - Giảng viên (select dropdown, required) - Load từ: SELECT u.id, u.name FROM Users u JOIN UserRoles ur ON u.id = ur.user_id WHERE ur.role = 'instructor'
+
+6. Validation: Tất cả trường bắt buộc không được để trống, giá >= 0, thumbnail_url phải là URL hợp lệ.
+
+7. Khi thêm khóa học: INSERT INTO Courses (instructor_id, category_id, title, price, description, thumbnail_url, created_at) VALUES (:instructor_id, :category_id, :title, :price, :description, :thumbnail_url, NOW()). API: POST /api/admin/courses.
+
+8. Nút "Sửa" phải load thông tin khóa học: SELECT * FROM Courses WHERE id = :id.
+
+9. Khi sửa khóa học: UPDATE Courses SET instructor_id = :instructor_id, category_id = :category_id, title = :title, price = :price, description = :description, thumbnail_url = :thumbnail_url, updated_at = NOW() WHERE id = :id. API: PUT /api/admin/courses/:id.
+
+10. Admin có thể thay đổi instructor_id (gán lại khóa học cho Instructor khác).
+
+11. Nút "Xóa" phải hiển thị confirm dialog: "Bạn có chắc muốn xóa khóa học '[Tên]'? Tất cả bài học và enrollment sẽ bị xóa."
+
+12. Khi xóa: DELETE FROM Courses WHERE id = :id (CASCADE sẽ tự động xóa Lessons và Enrollments). API: DELETE /api/admin/courses/:id.
+
+13. Tất cả API endpoints phải yêu cầu JWT token với role 'admin'.

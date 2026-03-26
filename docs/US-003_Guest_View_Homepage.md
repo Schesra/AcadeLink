@@ -55,9 +55,23 @@ Giao diện trang chủ bao gồm:
     * Thông tin liên hệ, links mạng xã hội.
 
 ## 6. Tiêu chí nghiệm thu (Acceptance Criteria)
-* **Hiển thị thành công**: Truy cập trang chủ -> Hiển thị banner, khóa học nổi bật và mới nhất.
-* **Click vào khóa học**: Click vào bất kỳ card khóa học nào -> Chuyển đến trang chi tiết "/courses/:id".
-* **Không có khóa học**: Database không có khóa học -> Hiển thị thông báo "Hiện chưa có khóa học nào".
-* **Responsive**: Truy cập từ mobile -> Layout tự động điều chỉnh, cards xếp theo cột dọc.
-* **Loading**: Khi đang tải dữ liệu -> Hiển thị skeleton hoặc loading spinner.
-* **Header**: Nếu chưa đăng nhập -> Hiển thị "Đăng nhập/Đăng ký". Nếu đã đăng nhập -> Hiển thị tên user.
+
+1. Trang chủ phải có Banner quảng cáo ở đầu trang (có thể là hình ảnh tĩnh hoặc slider).
+
+2. Section "Khóa học nổi bật" phải hiển thị tối đa 6-8 khóa học được đánh dấu nổi bật hoặc có số lượng enrollment cao nhất.
+
+3. Section "Khóa học mới nhất" phải hiển thị tối đa 6-8 khóa học được sắp xếp theo created_at DESC.
+
+4. Mỗi card khóa học phải hiển thị: Thumbnail (ảnh), Tên khóa học, Giá (định dạng tiền tệ VNĐ hoặc "Miễn phí" nếu price = 0), Tên danh mục.
+
+5. Click vào bất kỳ card khóa học nào phải chuyển hướng đến trang chi tiết khóa học "/courses/:id".
+
+6. Header phải hiển thị: Logo, Menu điều hướng (Trang chủ, Khóa học), và trạng thái đăng nhập (nếu chưa đăng nhập hiển thị "Đăng nhập/Đăng ký", nếu đã đăng nhập hiển thị tên user và dropdown menu).
+
+7. Footer phải hiển thị thông tin liên hệ và các links cơ bản.
+
+8. Nếu database không có khóa học nào, hiển thị thông báo "Hiện chưa có khóa học nào. Vui lòng quay lại sau."
+
+9. Khi đang tải dữ liệu từ API, hiển thị loading spinner hoặc skeleton screens.
+
+10. Giao diện phải responsive: trên PC hiển thị grid 3-4 cột, trên tablet 2 cột, trên mobile 1 cột.
