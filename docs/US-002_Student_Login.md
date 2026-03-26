@@ -92,21 +92,35 @@ Giao diện đăng nhập bao gồm:
 
 4. Email phải đúng định dạng (có @ và domain hợp lệ).
 
-5. **Hệ thống phải xác thực mật khẩu bằng cách so sánh password đã hash trong database với password user nhập vào** (sử dụng bcrypt.compare()).
+5. Xác thực đăng nhập: Query database SELECT id, email, password_hash, full_name FROM Users WHERE email = :email.
 
-6. **Khi đăng nhập thành công, hệ thống tạo JWT token** với cấu trúc:
+6. **Password verification phải sử dụng bcrypt.compare()**: 
+   - Lấy password_hash từ database (đã được hash bằng bcrypt với salt rounds = 10)
+   - So sánh: bcrypt.compare(inputPassword, storedPasswordHash)
+   - Nếu true → Đăng nhập thành công
+   - Nếu false → Trả về lỗi 401 "Email hoặc mật khẩu không chính xác"
+
+7. KHÔNG BAO GIỜ so sánh plain text password trực tiếp (inputPassword === storedPassword là SAI).
+
+8. Query bảng UserRoles để lấy danh sách roles: SELECT role FROM UserRoles WHERE user_id = :user_id.
+
+9. **Khi đăng nhập thành công, hệ thống tạo JWT token** với cấu trúc:
    - Header: { alg: "HS256", typ: "JWT" }
    - Payload: { user_id, email, roles: ["student", "instructor"], exp }
    - Signature: HMACSHA256(header + payload, SECRET_KEY)
 
-7. **JWT token phải có thời gian hết hạn (exp)** được set trong payload, ví dụ: 7 ngày (604800 giây).
+10. **JWT token phải có thời gian hết hạn (exp)** được set trong payload, ví dụ: 7 ngày (604800 giây).
 
-8. JWT token phải được lưu vào localStorage của client với key "token" hoặc httpOnly cookie.
+11. JWT token phải được lưu vào localStorage của client với key "token" hoặc httpOnly cookie.
 
-9. Sau khi đăng nhập thành công, chuyển hướng đến trang chủ "/" và header hiển thị tên user.
+12. Sau khi đăng nhập thành công, chuyển hướng đến trang chủ "/" và header hiển thị tên user.
 
-10. **Mỗi request đến API bảo mật phải gửi JWT token trong header**: Authorization: Bearer <token>
+13. **Mỗi request đến API bảo mật phải gửi JWT token trong header**: Authorization: Bearer <token>
 
-11. **Server phải verify JWT token** trước khi xử lý request: kiểm tra signature, kiểm tra exp (chưa hết hạn), extract user_id và roles từ payload.
+14. **Server phải verify JWT token** trước khi xử lý request: kiểm tra signature, kiểm tra exp (chưa hết hạn), extract user_id và roles từ payload.
 
-12. Khi click "Tiếp tục với tư cách khách", chuyển đến trang chủ mà không cần đăng nhập (không có token).
+15. Khi click "Tiếp tục với tư cách khách", chuyển đến trang chủ mà không cần đăng nhập (không có token).
+
+16. Nếu email không tồn tại trong database → Trả về lỗi 401 "Email hoặc mật khẩu không chính xác" (không tiết lộ email có tồn tại hay không để bảo mật).
+
+17. API endpoint: POST /api/auth/login với body: { email, password }. Response: { token, user: { id, email, full_name, roles } }.
