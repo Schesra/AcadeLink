@@ -166,7 +166,10 @@ const updateCourse = async (req, res) => {
 
   } catch (error) {
     console.error('Update course error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'Đã xảy ra lỗi khi cập nhật khóa học' 
+    });
   }
 };
 
@@ -377,7 +380,15 @@ const deleteLesson = async (req, res) => {
 const getMyEnrollments = async (req, res) => {
   try {
     const instructor_id = req.user.user_id;
-    const { status } = req.query;
+    const { status, course_id } = req.query;
+
+    // course_id là bắt buộc
+    if (!course_id) {
+      return res.status(400).json({ 
+        error: 'Missing required parameter',
+        message: 'course_id là bắt buộc' 
+      });
+    }
 
     let query = `
       SELECT 
@@ -387,16 +398,18 @@ const getMyEnrollments = async (req, res) => {
         e.updated_at,
         u.username,
         u.email,
+        u.full_name,
         c.title as course_title,
         c.id as course_id
       FROM enrollments e
       JOIN users u ON e.user_id = u.id
       JOIN courses c ON e.course_id = c.id
-      WHERE c.instructor_id = ?
+      WHERE c.instructor_id = ? AND c.id = ?
     `;
 
-    const params = [instructor_id];
+    const params = [instructor_id, course_id];
 
+    // Filter by status (optional)
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
       query += ' AND e.status = ?';
       params.push(status);
@@ -414,7 +427,10 @@ const getMyEnrollments = async (req, res) => {
 
   } catch (error) {
     console.error('Get my enrollments error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'Đã xảy ra lỗi khi lấy danh sách enrollment' 
+    });
   }
 };
 
@@ -427,8 +443,9 @@ const approveEnrollment = async (req, res) => {
     const { id } = req.params;
     const instructor_id = req.user.user_id;
 
-    // Chỉ approve enrollment của khóa học mình tạo
-    const [result] = await db.query("UPDATE enrollments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND course_id IN (SELECT id FROM courses WHERE instructor_id = ?) AND status = ?",
+    // Chỉ approve enrollment của khóa học mình tạo và status = pending
+    const [result] = await db.query(
+      'UPDATE enrollments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND course_id IN (SELECT id FROM courses WHERE instructor_id = ?) AND status = ?',
       ['approved', id, instructor_id, 'pending']
     );
 
@@ -443,7 +460,10 @@ const approveEnrollment = async (req, res) => {
 
   } catch (error) {
     console.error('Approve enrollment error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'Đã xảy ra lỗi khi duyệt enrollment' 
+    });
   }
 };
 
@@ -456,7 +476,9 @@ const rejectEnrollment = async (req, res) => {
     const { id } = req.params;
     const instructor_id = req.user.user_id;
 
-    const [result] = await db.query("UPDATE enrollments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND course_id IN (SELECT id FROM courses WHERE instructor_id = ?) AND status = ?",
+    // Chỉ reject enrollment của khóa học mình tạo và status = pending
+    const [result] = await db.query(
+      'UPDATE enrollments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND course_id IN (SELECT id FROM courses WHERE instructor_id = ?) AND status = ?',
       ['rejected', id, instructor_id, 'pending']
     );
 
@@ -471,7 +493,10 @@ const rejectEnrollment = async (req, res) => {
 
   } catch (error) {
     console.error('Reject enrollment error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'Đã xảy ra lỗi khi từ chối enrollment' 
+    });
   }
 };
 

@@ -71,12 +71,12 @@ async function seedDatabase() {
 
     // 6. Tạo enrollments
     await db.query(`
-      INSERT OR IGNORE INTO enrollments (user_id, course_id, status)
+      INSERT OR IGNORE INTO enrollments (id, user_id, course_id, status)
       VALUES 
-        (3, 1, 'approved'),
-        (3, 2, 'pending'),
-        (4, 1, 'approved'),
-        (4, 3, 'approved')
+        (1, 3, 1, 'approved'),
+        (2, 3, 2, 'pending'),
+        (3, 4, 1, 'approved'),
+        (4, 4, 3, 'approved')
     `);
     console.log('✅ Enrollments seeded');
 
@@ -85,6 +85,10 @@ async function seedDatabase() {
     console.log('   Admin: admin@acadelink.com / Password123@');
     console.log('   Instructor: instructor1@acadelink.com / Password123@');
     console.log('   Student: student1@acadelink.com / Password123@');
+    console.log('\n📊 Enrollments for testing:');
+    console.log('   - Enrollment 2 (student1 → React): PENDING - use for approve/reject tests');
+    console.log('   - instructor1 courses: Course 1 (JS), Course 2 (React)');
+    console.log('   - Query: GET /api/instructor/enrollments?course_id=2&status=pending');
     
     return true;
 
