@@ -1,5 +1,6 @@
 const mysql = require('mysql2');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 // Tạo connection pool để quản lý kết nối hiệu quả
 const pool = mysql.createPool({
@@ -17,7 +18,7 @@ const pool = mysql.createPool({
 const promisePool = pool.promise();
 
 // Test connection (comment tạm để test code trước)
-/*
+
 pool.getConnection((err, connection) => {
   if (err) {
     console.error('❌ Database connection failed:', err.message);
@@ -26,8 +27,8 @@ pool.getConnection((err, connection) => {
   console.log('✅ Database connected successfully');
   connection.release();
 });
-*/
 
-console.log('🧪 MOCK MODE: Database connection disabled for testing');
+
+// console.log('🧪 MOCK MODE: Database connection disabled for testing');
 
 module.exports = promisePool;

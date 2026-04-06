@@ -114,20 +114,20 @@ const register = async (req, res) => {
  */
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
     // Validation
-    if (!email || !password) {
+    if (!username || !password) {
       return res.status(400).json({ 
         error: 'Missing required fields',
-        message: 'Email và password là bắt buộc' 
+        message: 'Username và password là bắt buộc' 
       });
     }
 
-    // Tìm user theo email
+    // Tìm user theo username hoặc email
     const [users] = await db.query(
-      'SELECT id, username, email, password_hash, full_name FROM users WHERE email = ?',
-      [email]
+      'SELECT id, username, email, password_hash, full_name FROM users WHERE username = ? OR email = ?',
+      [username, username]
     );
 
     if (users.length === 0) {
@@ -278,8 +278,59 @@ const adminLogin = async (req, res) => {
   }
 };
 
+/**
+ * Refresh token với roles mới nhất
+ * POST /api/auth/refresh-token
+ */
+const refreshToken = async (req, res) => {
+  try {
+    const user_id = req.user.user_id;
+
+    // Lấy thông tin user mới nhất
+    const [users] = await db.query(
+      'SELECT id, username, email, full_name FROM users WHERE id = ?',
+      [user_id]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'User không tồn tại' });
+    }
+
+    const user = users[0];
+
+    // Lấy roles mới nhất
+    const [userRoles] = await db.query(
+      'SELECT role FROM user_roles WHERE user_id = ?',
+      [user_id]
+    );
+    const roles = userRoles.map(r => r.role);
+
+    // Issue token mới
+    const token = jwt.sign(
+      { user_id: user.id, email: user.email, roles },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        full_name: user.full_name,
+        roles
+      }
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi' });
+  }
+};
+
 module.exports = {
   register,
   login,
-  adminLogin
+  adminLogin,
+  refreshToken
 };
