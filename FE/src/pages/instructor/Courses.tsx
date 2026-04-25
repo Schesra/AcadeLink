@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Pencil, Trash2, Users } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, Users, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/services/api";
 
@@ -63,20 +63,22 @@ const InstructorCourses = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {courses.map((course) => (
-              <div key={course.id} className="bg-card rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div key={course.id} className="bg-card rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col">
                 {/* Thumbnail */}
-                <div className="aspect-video overflow-hidden bg-muted">
+                <div className="aspect-video overflow-hidden bg-muted shrink-0">
                   <img
-                    src={course.thumbnail_url || '/placeholder.svg'}
+                    src={course.thumbnail_url
+                      ? (course.thumbnail_url.startsWith('http') ? course.thumbnail_url : `http://localhost:3000${course.thumbnail_url}`)
+                      : '/placeholder.svg'}
                     alt={course.title}
                     className="w-full h-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                   />
                 </div>
                 {/* Info */}
-                <div className="p-4">
-                  <h3 className="font-semibold text-card-foreground line-clamp-2 mb-3">{course.title}</h3>
-                  <div className="flex items-center justify-between text-sm">
+                <div className="p-4 flex flex-col flex-1">
+                  <h3 className="font-semibold text-card-foreground line-clamp-2 mb-3 min-h-[2.75rem]">{course.title}</h3>
+                  <div className="flex items-center justify-between text-sm mt-auto">
                     <span className="text-muted-foreground flex items-center gap-1">
                       <Users size={14} /> {course.student_count || 0} học viên
                     </span>
@@ -86,9 +88,19 @@ const InstructorCourses = () => {
                   </div>
                   {/* Actions */}
                   <div className="flex gap-2 mt-3">
-                    <Link to={`/instructor/courses/${course.id}/edit`} className="flex-1">
+                    <Link to={`/instructor/courses/${course.id}/lessons`} className="flex-1">
                       <Button size="sm" variant="outline" className="w-full gap-1">
-                        <Pencil size={14} /> Sửa
+                        <BookOpen size={14} /> Bài học
+                        {course.lesson_count > 0 && (
+                          <span className="ml-1 bg-primary/10 text-primary text-xs rounded-full px-1.5">
+                            {course.lesson_count}
+                          </span>
+                        )}
+                      </Button>
+                    </Link>
+                    <Link to={`/instructor/courses/${course.id}/edit`}>
+                      <Button size="sm" variant="outline" className="gap-1">
+                        <Pencil size={14} />
                       </Button>
                     </Link>
                     <Button size="sm" variant="outline" className="text-destructive hover:text-destructive"

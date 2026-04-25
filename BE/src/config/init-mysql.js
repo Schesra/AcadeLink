@@ -86,6 +86,7 @@ async function initDatabase() {
         title VARCHAR(255) NOT NULL,
         content TEXT,
         video_url VARCHAR(500),
+        lesson_type ENUM('text', 'video', 'quiz') NOT NULL DEFAULT 'text',
         \`order\` INT NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -94,7 +95,40 @@ async function initDatabase() {
     `);
     console.log('✅ Table: lessons');
 
-    // 7. Enrollments Table
+    // 6b. Quiz Questions Table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS quiz_questions (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        lesson_id INT NOT NULL,
+        question TEXT NOT NULL,
+        option_a VARCHAR(500) NOT NULL,
+        option_b VARCHAR(500) NOT NULL,
+        option_c VARCHAR(500),
+        option_d VARCHAR(500),
+        correct_option CHAR(1) NOT NULL COMMENT 'a, b, c hoặc d',
+        \`order\` INT NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Table: quiz_questions');
+
+    // 7. Password Reset Tokens Table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        user_id INT NOT NULL,
+        token VARCHAR(64) NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Table: password_reset_tokens');
+
+    // 8. Enrollments Table
     await db.query(`
       CREATE TABLE IF NOT EXISTS enrollments (
         id INT PRIMARY KEY AUTO_INCREMENT,
@@ -120,6 +154,9 @@ async function initDatabase() {
       'CREATE INDEX idx_courses_category ON courses(category_id)',
       'CREATE INDEX idx_lessons_course ON lessons(course_id)',
       'CREATE INDEX idx_lessons_order ON lessons(course_id, `order`)',
+      'CREATE INDEX idx_quiz_questions_lesson ON quiz_questions(lesson_id)',
+      'CREATE INDEX idx_reset_tokens_token ON password_reset_tokens(token)',
+      'CREATE INDEX idx_reset_tokens_user ON password_reset_tokens(user_id)',
       'CREATE INDEX idx_enrollments_user ON enrollments(user_id)',
       'CREATE INDEX idx_enrollments_course ON enrollments(course_id)',
       'CREATE INDEX idx_enrollments_status ON enrollments(status)'

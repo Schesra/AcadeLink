@@ -1,4 +1,4 @@
-﻿const db = require('../config/database.sqlite');
+﻿const db = require('../config/database');
 
 /**
  * Đăng ký trở thành instructor
@@ -213,11 +213,12 @@ const getMyLessons = async (req, res) => {
     const instructor_id = req.user.user_id;
 
     const [lessons] = await db.query(`
-      SELECT 
+      SELECT
         l.id,
         l.title,
         l.content,
         l.video_url,
+        l.lesson_type,
         l.\`order\`,
         l.created_at,
         c.title as course_title,
@@ -247,37 +248,45 @@ const getMyLessons = async (req, res) => {
 const createLesson = async (req, res) => {
   try {
     const instructor_id = req.user.user_id;
-    const { course_id, title, content, video_url, order } = req.body;
+    const { course_id, title, content, video_url, lesson_type, order } = req.body;
+    const type = lesson_type || 'text';
 
     if (!course_id || !title || !order) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Missing required fields',
-        message: 'course_id, title, order là bắt buộc' 
+        message: 'course_id, title, order là bắt buộc'
       });
     }
 
     if (order < 1) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid order',
-        message: 'Thứ tự phải >= 1' 
+        message: 'Thứ tự phải >= 1'
       });
     }
 
-    // Kiểm tra course có phải của mình không
+    if (!['text', 'video', 'quiz'].includes(type)) {
+      return res.status(400).json({
+        error: 'Invalid lesson_type',
+        message: 'lesson_type phải là text, video hoặc quiz'
+      });
+    }
+
     const [courses] = await db.query(
       'SELECT id FROM courses WHERE id = ? AND instructor_id = ?',
       [course_id, instructor_id]
     );
 
     if (courses.length === 0) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Forbidden',
-        message: 'Bạn không có quyền thêm bài học vào khóa học này' 
+        message: 'Bạn không có quyền thêm bài học vào khóa học này'
       });
     }
 
-    const [result] = await db.query("INSERT INTO lessons (course_id, title, content, video_url, `order`, created_at, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-      [course_id, title, content || null, video_url || null, order]
+    const [result] = await db.query(
+      "INSERT INTO lessons (course_id, title, content, video_url, lesson_type, `order`, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+      [course_id, title, content || null, video_url || null, type, order]
     );
 
     res.status(201).json({
@@ -288,6 +297,7 @@ const createLesson = async (req, res) => {
         title,
         content,
         video_url,
+        lesson_type: type,
         order
       }
     });
@@ -306,31 +316,32 @@ const updateLesson = async (req, res) => {
   try {
     const { id } = req.params;
     const instructor_id = req.user.user_id;
-    const { course_id, title, content, video_url, order } = req.body;
+    const { course_id, title, content, video_url, lesson_type, order } = req.body;
+    const type = lesson_type || 'text';
 
     if (!course_id || !title || !order) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Missing required fields',
-        message: 'course_id, title, order là bắt buộc' 
+        message: 'course_id, title, order là bắt buộc'
       });
     }
 
     if (order < 1) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid order',
-        message: 'Thứ tự phải >= 1' 
+        message: 'Thứ tự phải >= 1'
       });
     }
 
-    // Chỉ update bài học của khóa học mình tạo
-    const [result] = await db.query("UPDATE lessons SET course_id = ?, title = ?, content = ?, video_url = ?, `order` = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND course_id IN (SELECT id FROM courses WHERE instructor_id = ?)",
-      [course_id, title, content || null, video_url || null, order, id, instructor_id]
+    const [result] = await db.query(
+      "UPDATE lessons SET course_id = ?, title = ?, content = ?, video_url = ?, lesson_type = ?, `order` = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND course_id IN (SELECT id FROM courses WHERE instructor_id = ?)",
+      [course_id, title, content || null, video_url || null, type, order, id, instructor_id]
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Not found',
-        message: 'Không tìm thấy bài học hoặc bạn không có quyền sửa' 
+        message: 'Không tìm thấy bài học hoặc bạn không có quyền sửa'
       });
     }
 
@@ -367,6 +378,142 @@ const deleteLesson = async (req, res) => {
 
   } catch (error) {
     console.error('Delete lesson error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ==================== QUIZ QUESTIONS ====================
+
+/**
+ * Lấy câu hỏi của một bài quiz
+ * GET /api/instructor/lessons/:lessonId/questions
+ */
+const getQuizQuestions = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const instructor_id = req.user.user_id;
+
+    // Verify lesson belongs to instructor's course
+    const [lessons] = await db.query(
+      'SELECT l.id FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.id = ? AND c.instructor_id = ?',
+      [lessonId, instructor_id]
+    );
+    if (lessons.length === 0) {
+      return res.status(404).json({ error: 'Not found', message: 'Không tìm thấy bài học' });
+    }
+
+    const [questions] = await db.query(
+      'SELECT id, question, option_a, option_b, option_c, option_d, correct_option, `order` FROM quiz_questions WHERE lesson_id = ? ORDER BY `order` ASC',
+      [lessonId]
+    );
+
+    res.json({ message: 'OK', total: questions.length, questions });
+  } catch (error) {
+    console.error('Get quiz questions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Tạo câu hỏi quiz
+ * POST /api/instructor/lessons/:lessonId/questions
+ */
+const createQuizQuestion = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const instructor_id = req.user.user_id;
+    const { question, option_a, option_b, option_c, option_d, correct_option, order } = req.body;
+
+    if (!question || !option_a || !option_b || !correct_option) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'question, option_a, option_b, correct_option là bắt buộc'
+      });
+    }
+
+    if (!['a', 'b', 'c', 'd'].includes(correct_option.toLowerCase())) {
+      return res.status(400).json({ error: 'Invalid correct_option', message: 'correct_option phải là a, b, c hoặc d' });
+    }
+
+    const [lessons] = await db.query(
+      'SELECT l.id FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.id = ? AND c.instructor_id = ? AND l.lesson_type = ?',
+      [lessonId, instructor_id, 'quiz']
+    );
+    if (lessons.length === 0) {
+      return res.status(404).json({ error: 'Not found', message: 'Không tìm thấy bài quiz hoặc bạn không có quyền' });
+    }
+
+    const questionOrder = order || 1;
+    const [result] = await db.query(
+      "INSERT INTO quiz_questions (lesson_id, question, option_a, option_b, option_c, option_d, correct_option, `order`, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+      [lessonId, question, option_a, option_b, option_c || null, option_d || null, correct_option.toLowerCase(), questionOrder]
+    );
+
+    res.status(201).json({
+      message: 'Tạo câu hỏi thành công',
+      question: { id: result.insertId, lesson_id: Number(lessonId), question, option_a, option_b, option_c, option_d, correct_option: correct_option.toLowerCase(), order: questionOrder }
+    });
+  } catch (error) {
+    console.error('Create quiz question error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Cập nhật câu hỏi quiz
+ * PUT /api/instructor/questions/:questionId
+ */
+const updateQuizQuestion = async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const instructor_id = req.user.user_id;
+    const { question, option_a, option_b, option_c, option_d, correct_option, order } = req.body;
+
+    if (!question || !option_a || !option_b || !correct_option) {
+      return res.status(400).json({ error: 'Missing required fields', message: 'question, option_a, option_b, correct_option là bắt buộc' });
+    }
+
+    if (!['a', 'b', 'c', 'd'].includes(correct_option.toLowerCase())) {
+      return res.status(400).json({ error: 'Invalid correct_option', message: 'correct_option phải là a, b, c hoặc d' });
+    }
+
+    const [result] = await db.query(
+      "UPDATE quiz_questions SET question = ?, option_a = ?, option_b = ?, option_c = ?, option_d = ?, correct_option = ?, `order` = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND lesson_id IN (SELECT l.id FROM lessons l JOIN courses c ON l.course_id = c.id WHERE c.instructor_id = ?)",
+      [question, option_a, option_b, option_c || null, option_d || null, correct_option.toLowerCase(), order || 1, questionId, instructor_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Not found', message: 'Không tìm thấy câu hỏi hoặc bạn không có quyền sửa' });
+    }
+
+    res.json({ message: 'Cập nhật câu hỏi thành công' });
+  } catch (error) {
+    console.error('Update quiz question error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Xóa câu hỏi quiz
+ * DELETE /api/instructor/questions/:questionId
+ */
+const deleteQuizQuestion = async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const instructor_id = req.user.user_id;
+
+    const [result] = await db.query(
+      "DELETE FROM quiz_questions WHERE id = ? AND lesson_id IN (SELECT l.id FROM lessons l JOIN courses c ON l.course_id = c.id WHERE c.instructor_id = ?)",
+      [questionId, instructor_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Not found', message: 'Không tìm thấy câu hỏi hoặc bạn không có quyền xóa' });
+    }
+
+    res.json({ message: 'Xóa câu hỏi thành công' });
+  } catch (error) {
+    console.error('Delete quiz question error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -512,6 +659,11 @@ module.exports = {
   createLesson,
   updateLesson,
   deleteLesson,
+  // Quiz Questions
+  getQuizQuestions,
+  createQuizQuestion,
+  updateQuizQuestion,
+  deleteQuizQuestion,
   // My Enrollments
   getMyEnrollments,
   approveEnrollment,

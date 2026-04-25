@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CourseCard from "@/components/CourseCard";
+import CourseCardSkeleton from "@/components/CourseCardSkeleton";
 import { BookOpen, Users, Award } from "lucide-react";
 import { courseService } from "@/services/courseService";
 
@@ -15,11 +16,12 @@ const features = [
 
 const Index = () => {
   const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     courseService.getAllCourses().then((data) => {
       setCourses((data.courses || []).slice(0, 6));
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   return (
@@ -35,7 +37,7 @@ const Index = () => {
           <p className="text-lg md:text-xl text-primary-foreground/90 mb-8 max-w-2xl mx-auto">
             Học kỹ năng mới, nâng cao sự nghiệp và khám phá tiềm năng của bạn cùng hàng nghìn khóa học chất lượng.
           </p>
-          <Link to="/courses">
+            <Link to="/courses">
             <Button variant="hero" size="lg">
               Khám phá khóa học
             </Button>
@@ -65,19 +67,24 @@ const Index = () => {
             Khóa học nổi bật
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => (
-              <CourseCard key={course.id} course={{
-                id: course.id.toString(),
-                title: course.title,
-                description: course.description,
-                price: course.price,
-                instructor: course.instructor_name,
-                category: course.category_name,
-                thumbnail: course.thumbnail_url || '/placeholder.svg',
-                lessons: 0,
-                students: course.student_count || 0,
-              }} />
-            ))}
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => <CourseCardSkeleton key={i} />)
+              : courses.map((course) => (
+                  <CourseCard key={course.id} course={{
+                    id: course.id.toString(),
+                    title: course.title,
+                    description: course.description,
+                    price: course.price,
+                    instructor: course.instructor_name,
+                    category: course.category_name,
+                    thumbnail: course.thumbnail_url
+                      ? (course.thumbnail_url.startsWith('http') ? course.thumbnail_url : `http://localhost:3000${course.thumbnail_url}`)
+                      : '/placeholder.svg',
+                    lessons: 0,
+                    students: course.student_count || 0,
+                  }} />
+                ))
+            }
           </div>
         </div>
       </section>

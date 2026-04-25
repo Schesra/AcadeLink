@@ -1,20 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
-
-// Initialize SQLite database
-const initDatabase = require('./config/init-sqlite');
-initDatabase().catch(err => {
-  console.error('Failed to initialize database:', err);
-  process.exit(1);
-});
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:8080'],
+  origin: ['http://localhost:5173', 'http://localhost:8080', 'http://localhost:8081'],
   credentials: true
 }));
 app.use(express.json());
@@ -28,21 +22,20 @@ app.use((req, res, next) => {
 
 // Import routes
 const testRoutes = require('./routes/test.routes');
-// SQLite MODE: Dùng routes thật với SQLite database
 const authRoutes = require('./routes/auth.routes');
 const guestRoutes = require('./routes/guest.routes');
 const studentRoutes = require('./routes/student.routes');
 const instructorRoutes = require('./routes/instructor.routes');
 const adminRoutes = require('./routes/admin.routes');
+const userRoutes = require('./routes/user.routes');
+const uploadRoutes = require('./routes/upload.routes');
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'ACADELINK API Server',
     version: '1.0.0',
     status: 'running',
-    mode: '💾 SQLite MODE (local database)',
-    database: 'acadelink.db',
     endpoints: {
       test: '/api/test',
       auth: '/api/auth (register, login)',
@@ -54,6 +47,9 @@ app.get('/', (req, res) => {
   });
 });
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // API Routes
 app.use('/api/test', testRoutes);
 app.use('/api/auth', authRoutes);
@@ -61,6 +57,8 @@ app.use('/api', guestRoutes);
 app.use('/api', studentRoutes);
 app.use('/api/instructor', instructorRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api', userRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // 404 handler
 app.use((req, res) => {

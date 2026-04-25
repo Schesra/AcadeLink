@@ -37,7 +37,12 @@ const Login = () => {
           title: "Thành công",
           description: "Đăng nhập thành công!",
         });
-        navigate('/');
+        // Redirect theo role
+        if (response.user.roles?.includes('admin')) {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
       }
     } catch (error: any) {
       toast({
@@ -54,7 +59,10 @@ const Login = () => {
     <div className="min-h-screen bg-muted flex items-center justify-center p-4">
       <div className="bg-card rounded-lg shadow-md p-8 w-full max-w-md">
         <div className="text-center mb-6">
-          <Link to="/" className="text-3xl font-bold text-primary">AcadeLink</Link>
+          <Link to="/" className="flex items-center justify-center gap-2 text-3xl font-bold text-primary">
+            <img src="/src/assets/Logo.png" alt="logo" className="h-10 w-10 object-contain" />
+            AcadeLink
+          </Link>
           <h1 className="text-2xl font-bold text-card-foreground mt-4">Đăng nhập</h1>
         </div>
 
@@ -83,7 +91,12 @@ const Login = () => {
               required
             />
           </div>
-          <Button type="submit" className="w-full mt-6 text-base font-semibold py-3" disabled={loading}>
+          <div className="flex justify-end">
+            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+              Quên mật khẩu?
+            </Link>
+          </div>
+          <Button type="submit" className="w-full mt-2 text-base font-semibold py-3" disabled={loading}>
             {loading ? "Đang xử lý..." : "Đăng nhập"}
           </Button>
         </form>

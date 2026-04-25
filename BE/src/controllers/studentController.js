@@ -1,4 +1,4 @@
-const db = require('../config/database.sqlite');
+const db = require('../config/database');
 
 /**
  * Đăng ký khóa học
@@ -154,11 +154,12 @@ const getCourseLessons = async (req, res) => {
 
     // Lấy danh sách bài học
     const [lessons] = await db.query(`
-      SELECT 
+      SELECT
         id,
         title,
         content,
         video_url,
+        lesson_type,
         \`order\`,
         created_at
       FROM lessons
@@ -166,10 +167,29 @@ const getCourseLessons = async (req, res) => {
       ORDER BY \`order\` ASC
     `, [id]);
 
+    // Gắn câu hỏi cho các bài quiz
+    const quizLessonIds = lessons.filter(l => l.lesson_type === 'quiz').map(l => l.id);
+    let questionsByLesson = {};
+    if (quizLessonIds.length > 0) {
+      const [questions] = await db.query(
+        'SELECT id, lesson_id, question, option_a, option_b, option_c, option_d, correct_option, `order` FROM quiz_questions WHERE lesson_id IN (?) ORDER BY `order` ASC',
+        [quizLessonIds]
+      );
+      for (const q of questions) {
+        if (!questionsByLesson[q.lesson_id]) questionsByLesson[q.lesson_id] = [];
+        questionsByLesson[q.lesson_id].push(q);
+      }
+    }
+
+    const lessonsWithQuestions = lessons.map(l => ({
+      ...l,
+      questions: l.lesson_type === 'quiz' ? (questionsByLesson[l.id] || []) : undefined
+    }));
+
     res.json({
       message: 'Lấy danh sách bài học thành công',
-      total: lessons.length,
-      lessons
+      total: lessonsWithQuestions.length,
+      lessons: lessonsWithQuestions
     });
 
   } catch (error) {

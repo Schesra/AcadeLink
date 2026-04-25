@@ -1,4 +1,4 @@
-﻿const db = require('../config/database.sqlite');
+﻿const db = require('../config/database');
 
 // ==================== CATEGORIES ====================
 
@@ -156,12 +156,13 @@ const deleteCategory = async (req, res) => {
 const getAllCourses = async (req, res) => {
   try {
     const [courses] = await db.query(`
-      SELECT 
+      SELECT
         c.id,
         c.title,
         c.description,
         c.price,
         c.thumbnail_url,
+        c.category_id,
         c.created_at,
         c.updated_at,
         cat.category_name,
@@ -284,6 +285,43 @@ const deleteCourse = async (req, res) => {
     res.json({ message: 'Xóa khóa học thành công' });
   } catch (error) {
     console.error('Delete course error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const getCourseDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [[courses], [lessons], [enrollments]] = await Promise.all([
+      db.query(`
+        SELECT c.id, c.title, c.description, c.price, c.thumbnail_url, c.created_at,
+          cat.id as category_id, cat.category_name,
+          u.id as instructor_id, u.username as instructor_name, u.full_name as instructor_full_name,
+          (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) as enrollment_count
+        FROM courses c
+        JOIN categories cat ON c.category_id = cat.id
+        JOIN users u ON c.instructor_id = u.id
+        WHERE c.id = ?
+      `, [id]),
+      db.query(`
+        SELECT id, title, content, video_url, \`order\`
+        FROM lessons WHERE course_id = ? ORDER BY \`order\` ASC
+      `, [id]),
+      db.query(`
+        SELECT e.id, e.status, e.enrolled_at,
+          u.username, u.full_name, u.email
+        FROM enrollments e
+        JOIN users u ON e.user_id = u.id
+        WHERE e.course_id = ? ORDER BY e.enrolled_at DESC
+      `, [id]),
+    ]);
+
+    if (courses.length === 0) return res.status(404).json({ error: 'Course not found' });
+
+    res.json({ course: { ...courses[0], lessons, enrollments } });
+  } catch (error) {
+    console.error('Get course detail error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -490,6 +528,117 @@ const updateEnrollment = async (req, res) => {
   }
 };
 
+// ==================== INSTRUCTORS ====================
+
+const getAllInstructors = async (req, res) => {
+  try {
+    const [instructors] = await db.query(`
+      SELECT
+        u.id, u.username, u.email, u.full_name, u.created_at,
+        COUNT(DISTINCT c.id) as course_count,
+        COALESCE(SUM(sub.cnt), 0) as student_count
+      FROM users u
+      JOIN user_roles ur ON u.id = ur.user_id AND ur.role = 'instructor'
+      LEFT JOIN courses c ON c.instructor_id = u.id
+      LEFT JOIN (
+        SELECT course_id, COUNT(*) as cnt FROM enrollments WHERE status = 'approved' GROUP BY course_id
+      ) sub ON sub.course_id = c.id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+    `);
+    res.json({ message: 'OK', total: instructors.length, instructors });
+  } catch (error) {
+    console.error('Get all instructors error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const getInstructorCourses = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [courses] = await db.query(`
+      SELECT c.id, c.title, c.price, c.thumbnail_url, cat.category_name,
+        (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id AND status = 'approved') as student_count,
+        (SELECT COUNT(*) FROM lessons WHERE course_id = c.id) as lesson_count
+      FROM courses c
+      JOIN categories cat ON c.category_id = cat.id
+      WHERE c.instructor_id = ?
+      ORDER BY c.created_at DESC
+    `, [id]);
+    res.json({ courses });
+  } catch (error) {
+    console.error('Get instructor courses error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const removeInstructorRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [result] = await db.query(
+      "DELETE FROM user_roles WHERE user_id = ? AND role = 'instructor'",
+      [id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Not found', message: 'Người dùng không có quyền giảng viên' });
+    }
+    res.json({ message: 'Đã thu hồi quyền giảng viên' });
+  } catch (error) {
+    console.error('Remove instructor role error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ==================== USERS ====================
+
+const getAllUsers = async (req, res) => {
+  try {
+    const [users] = await db.query(`
+      SELECT u.id, u.username, u.email, u.full_name, u.created_at,
+        GROUP_CONCAT(ur.role) as roles
+      FROM users u
+      LEFT JOIN user_roles ur ON u.id = ur.user_id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+    `);
+    res.json({ message: 'Lấy danh sách người dùng thành công', total: users.length, users });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [roles] = await db.query('SELECT role FROM user_roles WHERE user_id = ?', [id]);
+    if (roles.some(r => r.role === 'admin')) {
+      return res.status(403).json({ message: 'Không thể xóa tài khoản admin' });
+    }
+    const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [id]);
+    if (existing.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query('DELETE FROM user_roles WHERE user_id = ?', [id]);
+      await conn.query('DELETE FROM enrollments WHERE user_id = ?', [id]);
+      await conn.query('DELETE FROM users WHERE id = ?', [id]);
+      await conn.commit();
+    } catch (innerError) {
+      await conn.rollback();
+      throw innerError;
+    } finally {
+      conn.release();
+    }
+
+    res.json({ message: 'Xóa người dùng thành công' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   // Categories
   getAllCategories,
@@ -498,6 +647,7 @@ module.exports = {
   deleteCategory,
   // Courses
   getAllCourses,
+  getCourseDetail,
   createCourse,
   updateCourse,
   deleteCourse,
@@ -508,5 +658,12 @@ module.exports = {
   deleteLesson,
   // Enrollments
   getAllEnrollments,
-  updateEnrollment
+  updateEnrollment,
+  // Instructors
+  getAllInstructors,
+  getInstructorCourses,
+  removeInstructorRole,
+  // Users
+  getAllUsers,
+  deleteUser
 };

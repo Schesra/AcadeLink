@@ -21,7 +21,7 @@ const steps = [
 ];
 
 const BecomeInstructor = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, login } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);

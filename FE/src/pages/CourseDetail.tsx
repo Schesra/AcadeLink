@@ -3,6 +3,14 @@ import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Users, BookOpen, Video, FileText } from "lucide-react";
 import { courseService } from "@/services/courseService";
 import { useAuth } from "@/context/AuthContext";
@@ -104,29 +112,72 @@ const CourseDetail = () => {
     <div className="min-h-screen flex flex-col">
       <Header />
 
+      {/* Breadcrumb */}
+      <div className="bg-muted border-b px-4 py-3">
+        <div className="container mx-auto">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to="/">Trang chủ</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to="/courses">Khóa học</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="line-clamp-1 max-w-xs">{course.title}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+      </div>
+
       {/* Hero */}
       <section className="bg-gradient-to-r from-primary to-warning py-12">
-        <div className="container mx-auto px-4">
-          <span className="inline-block px-3 py-1 rounded-md text-sm font-medium bg-primary-foreground/20 text-primary-foreground mb-4">
-            {course.category_name}
-          </span>
-          <h1 className="text-3xl md:text-4xl font-bold text-primary-foreground mb-3">
-            {course.title}
-          </h1>
-          <p className="text-lg text-primary-foreground/90 mb-6 max-w-3xl">
-            {course.description}
-          </p>
-          <div className="flex flex-wrap gap-6 text-primary-foreground/90 text-sm mb-6">
-            <span className="flex items-center gap-2"><Users size={16} /> {course.instructor_name}</span>
-            <span className="flex items-center gap-2"><BookOpen size={16} /> {course.student_count || 0} học viên</span>
-            <span className="flex items-center gap-2"><Video size={16} /> {lessons.length} bài học</span>
+        <div className="container mx-auto px-4 flex flex-col md:flex-row items-center gap-8">
+          {/* Text */}
+          <div className="flex-1 min-w-0">
+            <span className="inline-block px-3 py-1 rounded-md text-sm font-medium bg-primary-foreground/20 text-primary-foreground mb-4">
+              {course.category_name}
+            </span>
+            <h1 className="text-3xl md:text-4xl font-bold text-primary-foreground mb-3">
+              {course.title}
+            </h1>
+            <p className="text-lg text-primary-foreground/90 mb-6 line-clamp-4">
+              {course.description}
+            </p>
+            <div className="flex flex-wrap gap-6 text-primary-foreground/90 text-sm mb-6">
+              <span className="flex items-center gap-2"><Users size={16} /> {course.instructor_name}</span>
+              <span className="flex items-center gap-2"><BookOpen size={16} /> {course.student_count || 0} học viên</span>
+              <span className="flex items-center gap-2"><Video size={16} /> {lessons.length} bài học</span>
+            </div>
+            <div className="flex items-center gap-6">
+              <span className="text-3xl font-bold text-primary-foreground">
+                {Number(course.price).toLocaleString('vi-VN')}₫
+              </span>
+              <Button variant="hero" size="lg" onClick={handleEnroll} disabled={enrolling}>
+                {enrolling ? "Đang xử lý..." : "Đăng ký khóa học"}
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
-            <span className="text-3xl font-bold text-primary-foreground">{course.price}</span>
-            <Button variant="hero" size="lg" onClick={handleEnroll} disabled={enrolling}>
-              {enrolling ? "Đang xử lý..." : "Đăng ký khóa học"}
-            </Button>
-          </div>
+
+          {/* Thumbnail */}
+          {course.thumbnail_url && (
+            <div className="w-full md:w-[420px] lg:w-[500px] shrink-0">
+              <div className="aspect-video rounded-xl overflow-hidden shadow-2xl">
+                <img
+                  src={course.thumbnail_url.startsWith('http') ? course.thumbnail_url : `http://localhost:3000${course.thumbnail_url}`}
+                  alt={course.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

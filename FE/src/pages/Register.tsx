@@ -60,7 +60,10 @@ const Register = () => {
     <div className="min-h-screen bg-muted flex items-center justify-center p-4">
       <div className="bg-card rounded-lg shadow-md p-8 w-full max-w-md">
         <div className="text-center mb-6">
-          <Link to="/" className="text-3xl font-bold text-primary">AcadeLink</Link>
+          <Link to="/" className="flex items-center justify-center gap-2 text-3xl font-bold text-primary">
+            <img src="/src/assets/Logo.png" alt="logo" className="h-10 w-10 object-contain" />
+            AcadeLink
+          </Link>
           <h1 className="text-2xl font-bold text-card-foreground mt-4">Đăng ký</h1>
         </div>
 

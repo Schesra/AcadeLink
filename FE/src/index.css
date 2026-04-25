@@ -60,35 +60,54 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  /* Dark mode uses same light values to keep consistent look */
   .dark {
-    --background: 210 20% 98%;
-    --foreground: 220 20% 10%;
+    --background: 222 25% 10%;
+    --foreground: 210 20% 94%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card: 222 25% 14%;
+    --card-foreground: 210 20% 94%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+    --popover: 222 25% 14%;
+    --popover-foreground: 210 20% 94%;
 
     --primary: 18 100% 60%;
     --primary-foreground: 0 0% 100%;
+    --primary-dark: 16 82% 54%;
+    --primary-light: 18 100% 69%;
+    --primary-lighter: 18 60% 20%;
 
-    --secondary: 0 0% 100%;
+    --secondary: 222 25% 18%;
     --secondary-foreground: 18 100% 60%;
 
-    --muted: 210 20% 98%;
-    --muted-foreground: 215 14% 46%;
+    --muted: 222 20% 18%;
+    --muted-foreground: 215 14% 60%;
 
-    --accent: 18 100% 94%;
-    --accent-foreground: 16 82% 54%;
+    --accent: 18 60% 20%;
+    --accent-foreground: 18 100% 70%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 149 40% 18%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --warning-light: 38 50% 18%;
+
+    --border: 222 20% 22%;
+    --input: 222 20% 22%;
     --ring: 18 100% 60%;
+
+    --sidebar-background: 222 25% 12%;
+    --sidebar-foreground: 210 20% 80%;
+    --sidebar-primary: 18 100% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 25% 18%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 222 20% 22%;
+    --sidebar-ring: 18 100% 60%;
   }
 }
 
@@ -101,4 +120,51 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif;
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Admin theme — light */
+.admin-theme {
+  --admin-sidebar:            0 0% 100%;
+  --admin-sidebar-hover:      18 100% 94%;
+  --admin-sidebar-active:     18 100% 60%;
+  --admin-sidebar-text:       220 9% 46%;
+  --admin-sidebar-text-active: 0 0% 100%;
+  --admin-header:             0 0% 100%;
+  --admin-bg:                 210 20% 96%;
+  --admin-primary:            18 100% 60%;
+  --admin-primary-light:      18 100% 94%;
+  --admin-approve:            160 84% 39%;
+  --admin-approve-light:      149 80% 90%;
+  --admin-pending:            38 92% 50%;
+  --admin-pending-light:      48 96% 89%;
+  --admin-reject:             0 84% 60%;
+  --admin-reject-light:       0 93% 94%;
+}
+
+/* Admin theme — dark */
+.dark .admin-theme {
+  --admin-sidebar:            222 25% 12%;
+  --admin-sidebar-hover:      222 25% 18%;
+  --admin-sidebar-active:     18 100% 60%;
+  --admin-sidebar-text:       210 20% 60%;
+  --admin-sidebar-text-active: 0 0% 100%;
+  --admin-header:             222 25% 14%;
+  --admin-bg:                 222 25% 10%;
+  --admin-primary:            18 100% 60%;
+  --admin-primary-light:      18 55% 22%;
+  --admin-approve:            160 70% 42%;
+  --admin-approve-light:      160 40% 18%;
+  --admin-pending:            38 85% 52%;
+  --admin-pending-light:      38 45% 18%;
+  --admin-reject:             0 72% 58%;
+  --admin-reject-light:       0 40% 18%;
 }

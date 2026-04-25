@@ -9,6 +9,7 @@
     "db:init": "node src/config/init-sqlite.js",
     "db:seed": "node src/config/seed-sqlite.js",
     "db:reset": "npm run db:init && npm run db:seed",
+    "db:seed-demo": "node src/config/seed-demo.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -26,7 +27,9 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
     "mysql2": "^3.20.0",
+    "nodemailer": "^8.0.5",
     "sqlite3": "^6.0.1"
   },
   "devDependencies": {

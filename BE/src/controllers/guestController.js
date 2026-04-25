@@ -1,4 +1,4 @@
-const db = require('../config/database.sqlite');
+const db = require('../config/database');
 
 /**
  * Lấy danh sách tất cả khóa học (Public)
@@ -9,7 +9,7 @@ const getAllCourses = async (req, res) => {
     const { category_id } = req.query;
 
     let query = `
-      SELECT 
+      SELECT
         c.id,
         c.title,
         c.description,
@@ -18,10 +18,16 @@ const getAllCourses = async (req, res) => {
         c.created_at,
         cat.category_name,
         u.username as instructor_name,
-        (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id AND status = 'approved') as student_count
+        COALESCE(e.student_count, 0) as student_count
       FROM courses c
       JOIN categories cat ON c.category_id = cat.id
       JOIN users u ON c.instructor_id = u.id
+      LEFT JOIN (
+        SELECT course_id, COUNT(*) as student_count
+        FROM enrollments
+        WHERE status = 'approved'
+        GROUP BY course_id
+      ) e ON e.course_id = c.id
     `;
 
     const params = [];
@@ -60,7 +66,7 @@ const getCourseDetail = async (req, res) => {
 
     // Lấy thông tin khóa học
     const [courses] = await db.query(`
-      SELECT 
+      SELECT
         c.id,
         c.title,
         c.description,
@@ -72,10 +78,16 @@ const getCourseDetail = async (req, res) => {
         cat.category_name,
         u.username as instructor_name,
         u.full_name as instructor_full_name,
-        (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id AND status = 'approved') as student_count
+        COALESCE(e.student_count, 0) as student_count
       FROM courses c
       JOIN categories cat ON c.category_id = cat.id
       JOIN users u ON c.instructor_id = u.id
+      LEFT JOIN (
+        SELECT course_id, COUNT(*) as student_count
+        FROM enrollments
+        WHERE status = 'approved'
+        GROUP BY course_id
+      ) e ON e.course_id = c.id
       WHERE c.id = ?
     `, [id]);
 

@@ -21,6 +21,7 @@ router.delete('/categories/:id', authenticateToken, checkRole(['admin']), adminC
 
 // ==================== COURSES ====================
 router.get('/courses', authenticateToken, checkRole(['admin']), adminController.getAllCourses);
+router.get('/courses/:id', authenticateToken, checkRole(['admin']), adminController.getCourseDetail);
 router.post('/courses', authenticateToken, checkRole(['admin']), adminController.createCourse);
 router.put('/courses/:id', authenticateToken, checkRole(['admin']), adminController.updateCourse);
 router.delete('/courses/:id', authenticateToken, checkRole(['admin']), adminController.deleteCourse);
@@ -34,5 +35,14 @@ router.delete('/lessons/:id', authenticateToken, checkRole(['admin']), adminCont
 // ==================== ENROLLMENTS ====================
 router.get('/enrollments', authenticateToken, checkRole(['admin']), adminController.getAllEnrollments);
 router.put('/enrollments/:id', authenticateToken, checkRole(['admin']), adminController.updateEnrollment);
+
+// ==================== INSTRUCTORS ====================
+router.get('/instructors', authenticateToken, checkRole(['admin']), adminController.getAllInstructors);
+router.get('/instructors/:id/courses', authenticateToken, checkRole(['admin']), adminController.getInstructorCourses);
+router.delete('/instructors/:id/role', authenticateToken, checkRole(['admin']), adminController.removeInstructorRole);
+
+// ==================== USERS ====================
+router.get('/users', authenticateToken, checkRole(['admin']), adminController.getAllUsers);
+router.delete('/users/:id', authenticateToken, checkRole(['admin']), adminController.deleteUser);
 
 module.exports = router;

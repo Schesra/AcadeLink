@@ -66,6 +66,31 @@ router.delete('/lessons/:id',
   instructorController.deleteLesson
 );
 
+// ==================== QUIZ QUESTIONS ====================
+router.get('/lessons/:lessonId/questions',
+  authenticateToken,
+  checkRole(['instructor', 'admin']),
+  instructorController.getQuizQuestions
+);
+
+router.post('/lessons/:lessonId/questions',
+  authenticateToken,
+  checkRole(['instructor', 'admin']),
+  instructorController.createQuizQuestion
+);
+
+router.put('/questions/:questionId',
+  authenticateToken,
+  checkRole(['instructor', 'admin']),
+  instructorController.updateQuizQuestion
+);
+
+router.delete('/questions/:questionId',
+  authenticateToken,
+  checkRole(['instructor', 'admin']),
+  instructorController.deleteQuizQuestion
+);
+
 // ==================== MY ENROLLMENTS ====================
 router.get('/enrollments', 
   authenticateToken, 

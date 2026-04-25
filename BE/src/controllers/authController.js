@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const db = require('../config/database.sqlite');
+const crypto = require('crypto');
+const db = require('../config/database');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 /**
  * Đăng ký tài khoản mới
@@ -328,9 +330,155 @@ const refreshToken = async (req, res) => {
   }
 };
 
+/**
+ * Gửi mã OTP đặt lại mật khẩu về email
+ * POST /api/auth/forgot-password
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Missing email', message: 'Vui lòng nhập email' });
+    }
+
+    const [users] = await db.query(
+      'SELECT id, email, full_name FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Email not found', message: 'Email này chưa được đăng ký trong hệ thống' });
+    }
+
+    const user = users[0];
+
+    // Xóa OTP cũ chưa dùng
+    await db.query(
+      'DELETE FROM password_reset_tokens WHERE user_id = ? AND used = FALSE',
+      [user.id]
+    );
+
+    // Tạo OTP 6 chữ số
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Hết hạn sau 10 phút
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await db.query(
+      'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)',
+      [user.id, otp, expiresAt]
+    );
+
+    sendPasswordResetEmail(user.email, otp, user.full_name).catch((err) => {
+      console.error('Send OTP email error:', err);
+    });
+
+    res.json({ message: 'Mã xác thực đã được gửi đến email của bạn' });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Internal server error', message: 'Đã xảy ra lỗi. Vui lòng thử lại.' });
+  }
+};
+
+/**
+ * Đặt lại mật khẩu bằng OTP
+ * POST /api/auth/reset-password  { email, otp, newPassword }
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Missing fields', message: 'Email, mã OTP và mật khẩu mới là bắt buộc' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password too short', message: 'Mật khẩu phải có ít nhất 8 ký tự' });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        error: 'Password too weak',
+        message: 'Mật khẩu phải chứa ít nhất: 1 chữ hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt (@$!%*?&)'
+      });
+    }
+
+    // Tìm user
+    const [users] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'Invalid', message: 'Thông tin không hợp lệ' });
+    }
+
+    // Tìm OTP hợp lệ
+    const [tokens] = await db.query(
+      'SELECT id, expires_at, used FROM password_reset_tokens WHERE user_id = ? AND token = ?',
+      [users[0].id, otp]
+    );
+
+    if (tokens.length === 0) {
+      return res.status(400).json({ error: 'Invalid OTP', message: 'Mã xác thực không đúng' });
+    }
+
+    const record = tokens[0];
+
+    if (record.used) {
+      return res.status(400).json({ error: 'OTP used', message: 'Mã xác thực đã được sử dụng rồi' });
+    }
+
+    if (new Date() > new Date(record.expires_at)) {
+      return res.status(400).json({ error: 'OTP expired', message: 'Mã xác thực đã hết hạn. Vui lòng yêu cầu mã mới.' });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 10);
+
+    await db.query(
+      'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [password_hash, users[0].id]
+    );
+
+    await db.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = ?', [record.id]);
+
+    res.json({ message: 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới.' });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Internal server error', message: 'Đã xảy ra lỗi. Vui lòng thử lại.' });
+  }
+};
+
+// Giữ lại để tránh lỗi export nhưng không dùng nữa
+const verifyResetToken = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).json({ valid: false, message: 'Token không được cung cấp' });
+    }
+
+    const [tokens] = await db.query(
+      'SELECT id, expires_at, used FROM password_reset_tokens WHERE token = ?',
+      [token]
+    );
+
+    if (tokens.length === 0 || tokens[0].used || new Date() > new Date(tokens[0].expires_at)) {
+      return res.json({ valid: false, message: 'Token không hợp lệ hoặc đã hết hạn' });
+    }
+
+    res.json({ valid: true });
+  } catch (error) {
+    console.error('Verify reset token error:', error);
+    res.status(500).json({ valid: false, message: 'Lỗi server' });
+  }
+};
+
 module.exports = {
   register,
   login,
   adminLogin,
-  refreshToken
+  refreshToken,
+  forgotPassword,
+  resetPassword,
+  verifyResetToken
 };
