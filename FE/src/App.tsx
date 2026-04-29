@@ -5,6 +5,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
+import Cart from "./pages/Cart.tsx";
 import InstructorRoute from "@/components/InstructorRoute";
 import Index from "./pages/Index.tsx";
 import Courses from "./pages/Courses.tsx";
@@ -30,6 +32,11 @@ import AdminEnrollments from "./pages/admin/AdminEnrollments.tsx";
 import AdminUsers from "./pages/admin/AdminUsers.tsx";
 import AdminCategories from "./pages/admin/AdminCategories.tsx";
 import AdminInstructors from "./pages/admin/AdminInstructors.tsx";
+import AdminNotifications from "./pages/admin/AdminNotifications.tsx";
+import AdminPayments from "./pages/admin/AdminPayments.tsx";
+import SupportTickets from "./pages/SupportTickets.tsx";
+import Notifications from "./pages/Notifications.tsx";
+import Payment from "./pages/Payment.tsx";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +45,7 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="acadelink-theme">
       <TooltipProvider>
         <AuthProvider>
+          <CartProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -52,6 +60,10 @@ const App = () => (
               <Route path="/become-instructor" element={<BecomeInstructor />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/support" element={<SupportTickets />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/payment/:orderId" element={<Payment />} />
               {/* Instructor routes */}
               <Route path="/instructor/dashboard" element={
                 <InstructorRoute><InstructorDashboard /></InstructorRoute>
@@ -81,9 +93,12 @@ const App = () => (
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="categories" element={<AdminCategories />} />
                 <Route path="instructors" element={<AdminInstructors />} />
+                <Route path="notifications" element={<AdminNotifications />} />
+                <Route path="payments" element={<AdminPayments />} />
               </Route>
             </Routes>
           </BrowserRouter>
+          </CartProvider>
         </AuthProvider>
       </TooltipProvider>
     </ThemeProvider>

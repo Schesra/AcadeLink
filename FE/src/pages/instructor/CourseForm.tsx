@@ -189,7 +189,7 @@ const CourseForm = () => {
             <div className="mt-1">
               {previewUrl ? (
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-input group">
-                  <img src={previewUrl.startsWith('blob:') ? previewUrl : `http://localhost:3000${previewUrl}`}
+                  <img src={previewUrl.startsWith('http') || previewUrl.startsWith('blob:') ? previewUrl : `http://localhost:3000${previewUrl}`}
                     alt="Thumbnail preview" className="w-full h-full object-cover" />
                   <button type="button" onClick={handleRemoveThumbnail}
                     className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors">

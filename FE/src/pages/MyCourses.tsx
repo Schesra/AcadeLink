@@ -46,7 +46,11 @@ const EnrollmentCard = ({ enrollment }: { enrollment: Enrollment }) => {
       {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden">
         <img
-          src={enrollment.thumbnail_url || "/placeholder.svg"}
+          src={
+            enrollment.thumbnail_url
+              ? (enrollment.thumbnail_url.startsWith('http') ? enrollment.thumbnail_url : `http://localhost:3000${enrollment.thumbnail_url}`)
+              : "/placeholder.svg"
+          }
           alt={enrollment.title}
           className="w-full h-full object-cover"
           loading="lazy"

@@ -1,4 +1,5 @@
 ﻿const db = require('../config/database');
+const { createNotification } = require('./notificationController');
 
 /**
  * Đăng ký trở thành instructor
@@ -289,10 +290,30 @@ const createLesson = async (req, res) => {
       [course_id, title, content || null, video_url || null, type, order]
     );
 
+    const lessonId = result.insertId;
+
+    // Notify tất cả học viên đã được duyệt vào khóa học
+    const [[courseInfo]] = await db.query('SELECT title FROM courses WHERE id = ?', [course_id]);
+    const [enrolledStudents] = await db.query(
+      'SELECT user_id FROM enrollments WHERE course_id = ? AND status = ?',
+      [course_id, 'approved']
+    );
+    if (courseInfo) {
+      for (const s of enrolledStudents) {
+        await createNotification(
+          s.user_id,
+          'new_lesson',
+          'Khóa học có bài học mới 📚',
+          `Khóa học "${courseInfo.title}" vừa được bổ sung bài học mới: "${title}". Vào học ngay nhé!`,
+          Number(course_id)
+        );
+      }
+    }
+
     res.status(201).json({
       message: 'Tạo bài học thành công',
       lesson: {
-        id: result.insertId,
+        id: lessonId,
         course_id,
         title,
         content,
@@ -603,6 +624,21 @@ const approveEnrollment = async (req, res) => {
       });
     }
 
+    // Gửi thông báo cho student
+    const [[enrollment]] = await db.query(
+      'SELECT e.user_id, c.title FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE e.id = ?',
+      [id]
+    );
+    if (enrollment) {
+      await createNotification(
+        enrollment.user_id,
+        'enrollment_approved',
+        'Yêu cầu đăng ký được duyệt',
+        `Yêu cầu đăng ký khóa học "${enrollment.title}" của bạn đã được chấp nhận. Bắt đầu học ngay!`,
+        Number(id)
+      );
+    }
+
     res.json({ message: 'Duyệt enrollment thành công' });
 
   } catch (error) {
@@ -636,6 +672,21 @@ const rejectEnrollment = async (req, res) => {
       });
     }
 
+    // Gửi thông báo cho student
+    const [[enrollment]] = await db.query(
+      'SELECT e.user_id, c.title FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE e.id = ?',
+      [id]
+    );
+    if (enrollment) {
+      await createNotification(
+        enrollment.user_id,
+        'enrollment_rejected',
+        'Yêu cầu đăng ký bị từ chối',
+        `Yêu cầu đăng ký khóa học "${enrollment.title}" của bạn đã bị từ chối.`,
+        Number(id)
+      );
+    }
+
     res.json({ message: 'Từ chối enrollment thành công' });
 
   } catch (error) {
@@ -644,6 +695,109 @@ const rejectEnrollment = async (req, res) => {
       error: 'Internal server error',
       message: 'Đã xảy ra lỗi khi từ chối enrollment' 
     });
+  }
+};
+
+/**
+ * Lấy thống kê doanh thu của instructor
+ * GET /api/instructor/earnings
+ */
+const getEarnings = async (req, res) => {
+  try {
+    const instructor_id = req.user.user_id;
+
+    // Số dư từ instructor_transactions (nguồn chính xác)
+    const [[balRow]] = await db.query(`
+      SELECT
+        COALESCE(SUM(
+          CASE
+            WHEN type = 'credit' THEN amount
+            WHEN type = 'debit' THEN -amount
+            ELSE 0
+          END
+        ), 0) AS available_balance,
+        COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) AS total_credited
+      FROM instructor_transactions
+      WHERE instructor_id = ?
+    `, [instructor_id]);
+
+    const availableBalance = Number(balRow.available_balance);
+    const holdingBalance = 0;
+    const totalRevenue = Number(balRow.total_credited); // tổng đã nhận (gross, trước debit)
+
+    // Tổng đã rút (completed withdrawals)
+    const [[withdrawnRow]] = await db.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total_withdrawn
+       FROM withdrawal_requests WHERE instructor_id = ? AND status = 'completed'`,
+      [instructor_id]
+    );
+    const totalWithdrawn = Number(withdrawnRow.total_withdrawn);
+
+    // Doanh thu theo khóa học từ order_items (paid orders)
+    const [paidCourseStats] = await db.query(`
+      SELECT
+        c.id AS course_id,
+        c.title,
+        c.price,
+        COUNT(oi.id) AS sale_count,
+        COALESCE(SUM(oi.instructor_amount), 0) AS revenue
+      FROM courses c
+      LEFT JOIN order_items oi ON oi.course_id = c.id
+      LEFT JOIN orders o ON oi.order_id = o.id AND o.status = 'paid'
+      WHERE c.instructor_id = ?
+      GROUP BY c.id, c.title, c.price
+    `, [instructor_id]);
+
+    // Học viên từ approved enrollments (bao gồm cả free courses)
+    const [enrollmentStats] = await db.query(`
+      SELECT c.id AS course_id, COUNT(e.id) AS approved_count
+      FROM courses c
+      LEFT JOIN enrollments e ON e.course_id = c.id AND e.status = 'approved'
+      WHERE c.instructor_id = ?
+      GROUP BY c.id
+    `, [instructor_id]);
+    const enrollmentMap = {};
+    for (const row of enrollmentStats) enrollmentMap[row.course_id] = Number(row.approved_count);
+
+    const courseStats = paidCourseStats.map(c => ({
+      ...c,
+      approved_count: enrollmentMap[c.course_id] || 0,
+    })).sort((a, b) => Number(b.revenue) - Number(a.revenue));
+
+    const totalStudents = Object.values(enrollmentMap).reduce((s, n) => s + n, 0);
+
+    // 10 giao dịch gần nhất từ instructor_transactions (credits)
+    const [recentTransactions] = await db.query(`
+      SELECT
+        it.id, it.amount, it.description, it.status AS tx_status,
+        it.hold_until, it.created_at,
+        oi.course_id,
+        c.title AS course_title,
+        o.user_id AS student_user_id,
+        u.full_name AS student_name, u.username AS student_username
+      FROM instructor_transactions it
+      LEFT JOIN order_items oi ON it.related_order_item_id = oi.id
+      LEFT JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN users u ON o.user_id = u.id
+      LEFT JOIN courses c ON oi.course_id = c.id
+      WHERE it.instructor_id = ? AND it.type = 'credit'
+      ORDER BY it.created_at DESC
+      LIMIT 10
+    `, [instructor_id]);
+
+    res.json({
+      message: 'Lấy thống kê doanh thu thành công',
+      total_revenue: totalRevenue,
+      total_withdrawn: totalWithdrawn,
+      available_balance: availableBalance,
+      holding_balance: holdingBalance,
+      total_students: totalStudents,
+      course_stats: courseStats,
+      recent_transactions: recentTransactions,
+    });
+  } catch (error) {
+    console.error('Get earnings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -667,5 +821,7 @@ module.exports = {
   // My Enrollments
   getMyEnrollments,
   approveEnrollment,
-  rejectEnrollment
+  rejectEnrollment,
+  // Earnings
+  getEarnings
 };

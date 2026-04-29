@@ -2,6 +2,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ReviewSection from "@/components/ReviewSection";
+import SupportTicketModal from "@/components/SupportTicketModal";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -13,18 +15,24 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Users, BookOpen, Video, FileText } from "lucide-react";
 import { courseService } from "@/services/courseService";
+import { cartService } from "@/services/cartService";
+import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { ShoppingCart } from "lucide-react";
 
 const CourseDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { cartCourseIds, refresh: refreshCart } = useCart();
   const [course, setCourse] = useState<any>(null);
   const [lessons, setLessons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -32,6 +40,17 @@ const CourseDetail = () => {
       fetchLessons();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (isAuthenticated && id) {
+      courseService.getMyCourses().then(data => {
+        const enrolled = (data.enrollments || []).some(
+          (e: any) => String(e.course_id) === id && e.status === 'approved'
+        );
+        setIsEnrolled(enrolled);
+      }).catch(() => {});
+    }
+  }, [isAuthenticated, id]);
 
   const fetchCourseDetail = async () => {
     try {
@@ -65,22 +84,48 @@ const CourseDetail = () => {
       return;
     }
 
+    // Paid course → add to cart then go to cart for checkout
+    if (Number(course?.price) > 0) {
+      setEnrolling(true);
+      try {
+        if (!cartCourseIds.has(Number(id))) {
+          await cartService.addToCart(Number(id));
+          refreshCart();
+        }
+        navigate('/cart');
+      } catch (error: any) {
+        toast({ title: "Lỗi", description: error.response?.data?.message || "Không thể thêm vào giỏ hàng", variant: "destructive" });
+      } finally {
+        setEnrolling(false);
+      }
+      return;
+    }
+
+    // Free course → enroll directly (pending, waits for instructor approval)
     setEnrolling(true);
     try {
       await courseService.enrollCourse(id!);
-      toast({
-        title: "Thành công",
-        description: "Đăng ký khóa học thành công!",
-      });
+      toast({ title: "Thành công", description: "Đăng ký khóa học thành công! Vui lòng chờ giảng viên duyệt." });
       navigate('/my-courses');
     } catch (error: any) {
-      toast({
-        title: "Lỗi",
-        description: error.response?.data?.message || "Đăng ký khóa học thất bại",
-        variant: "destructive",
-      });
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Đăng ký khóa học thất bại", variant: "destructive" });
     } finally {
       setEnrolling(false);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!isAuthenticated) { navigate('/login'); return; }
+    if (cartCourseIds.has(Number(id))) { navigate('/cart'); return; }
+    setAddingToCart(true);
+    try {
+      await cartService.addToCart(Number(id));
+      refreshCart();
+      toast({ title: "Đã thêm vào giỏ hàng", description: "Xem giỏ hàng để đăng ký" });
+    } catch (error: any) {
+      toast({ title: "Lỗi", description: error.response?.data?.message || "Không thể thêm vào giỏ hàng", variant: "destructive" });
+    } finally {
+      setAddingToCart(false);
     }
   };
 
@@ -156,13 +201,31 @@ const CourseDetail = () => {
               <span className="flex items-center gap-2"><BookOpen size={16} /> {course.student_count || 0} học viên</span>
               <span className="flex items-center gap-2"><Video size={16} /> {lessons.length} bài học</span>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-3xl font-bold text-primary-foreground">
-                {Number(course.price).toLocaleString('vi-VN')}₫
+                {Number(course.price) === 0 ? 'Miễn phí' : `${Number(course.price).toLocaleString('vi-VN')}₫`}
               </span>
-              <Button variant="hero" size="lg" onClick={handleEnroll} disabled={enrolling}>
-                {enrolling ? "Đang xử lý..." : "Đăng ký khóa học"}
-              </Button>
+              {isEnrolled ? (
+                <Button variant="hero" size="lg" onClick={() => navigate(`/learn/${id}`)}>
+                  Vào học ngay
+                </Button>
+              ) : (
+                <>
+                  <Button variant="hero" size="lg" onClick={handleEnroll} disabled={enrolling}>
+                    {enrolling ? "Đang xử lý..." : Number(course?.price) > 0 ? "Mua ngay" : "Đăng ký ngay"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={handleAddToCart}
+                    disabled={addingToCart}
+                    className="bg-white/10 border-white/30 text-white hover:bg-white/20 gap-2"
+                  >
+                    <ShoppingCart size={18} />
+                    {cartCourseIds.has(Number(id)) ? "Xem giỏ hàng" : addingToCart ? "Đang thêm..." : "Thêm vào giỏ"}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -212,6 +275,17 @@ const CourseDetail = () => {
               <p className="text-muted-foreground">Chưa có bài học nào</p>
             )}
           </div>
+          {/* Reviews */}
+          <div className="bg-card rounded-lg shadow-sm p-8">
+            <ReviewSection courseId={id!} isEnrolled={isEnrolled} />
+          </div>
+
+          {/* Support */}
+          {isAuthenticated && isEnrolled && (
+            <div className="flex justify-end">
+              <SupportTicketModal courseId={course.id} courseTitle={course.title} />
+            </div>
+          )}
         </div>
       </section>
 

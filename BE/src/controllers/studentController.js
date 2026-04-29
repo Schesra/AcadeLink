@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { createNotification } = require('./notificationController');
 
 /**
  * Đăng ký khóa học
@@ -60,14 +61,45 @@ const enrollCourse = async (req, res) => {
       [user_id, course_id, 'pending']
     );
 
+    const courseTitle = courses[0].title;
+    const enrollmentId = result.insertId;
+
+    // Lấy tên học viên
+    const [[student]] = await db.query('SELECT full_name, username FROM users WHERE id = ?', [user_id]);
+    const studentName = student?.full_name || student?.username || 'Học viên';
+
+    // Notify instructor
+    const [[course]] = await db.query('SELECT instructor_id FROM courses WHERE id = ?', [course_id]);
+    if (course) {
+      await createNotification(
+        course.instructor_id,
+        'new_enrollment',
+        'Có học viên mới đăng ký',
+        `${studentName} vừa đăng ký khóa học "${courseTitle}". Hãy xem xét và duyệt yêu cầu.`,
+        enrollmentId
+      );
+    }
+
+    // Notify tất cả admin
+    const [admins] = await db.query('SELECT user_id FROM user_roles WHERE role = ?', ['admin']);
+    for (const admin of admins) {
+      await createNotification(
+        admin.user_id,
+        'new_enrollment',
+        'Yêu cầu ghi danh mới',
+        `${studentName} vừa đăng ký khóa học "${courseTitle}" và đang chờ duyệt.`,
+        enrollmentId
+      );
+    }
+
     res.status(201).json({
       message: 'Đăng ký khóa học thành công. Vui lòng chờ giảng viên duyệt.',
       enrollment: {
-        id: result.insertId,
+        id: enrollmentId,
         user_id,
         course_id,
         status: 'pending',
-        course_title: courses[0].title
+        course_title: courseTitle
       }
     });
 

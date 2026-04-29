@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "mcp__grapuco__semantic_search"
+      "mcp__grapuco__semantic_search",
+      "Bash(npx tsc *)"
     ]
   }
 }

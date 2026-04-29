@@ -36,4 +36,32 @@ export const courseService = {
     const response = await api.get('/categories');
     return response.data;
   },
+
+  // ==================== REVIEWS ====================
+  getCourseReviews: async (courseId: string) => {
+    const response = await api.get(`/courses/${courseId}/reviews`);
+    return response.data;
+  },
+  createReview: async (courseId: string, data: { rating: number; comment?: string }) => {
+    const response = await api.post(`/courses/${courseId}/reviews`, data);
+    return response.data;
+  },
+  deleteReview: async (courseId: string) => {
+    const response = await api.delete(`/courses/${courseId}/reviews`);
+    return response.data;
+  },
+
+  // ==================== PROGRESS ====================
+  getCourseProgress: async (courseId: string) => {
+    const response = await api.get(`/courses/${courseId}/progress`);
+    return response.data;
+  },
+  completeLesson: async (lessonId: number) => {
+    const response = await api.post(`/lessons/${lessonId}/complete`);
+    return response.data;
+  },
+  uncompleteLesson: async (lessonId: number) => {
+    const response = await api.delete(`/lessons/${lessonId}/complete`);
+    return response.data;
+  },
 };

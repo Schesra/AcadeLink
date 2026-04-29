@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, BookOpen, Users, ClipboardList,
-  ChevronLeft, ChevronRight, LogOut, Tag, Bell, Moon, Sun, GraduationCap,
+  ChevronLeft, ChevronRight, LogOut, Tag, Bell, Moon, Sun, GraduationCap, CreditCard,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent,
@@ -18,43 +18,98 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "next-themes";
-import api from "@/services/api";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
+import { notificationService, Notification } from "@/services/notificationService";
+
+const typeConfig: Record<string, { bg: string; emoji: string }> = {
+  enrollment_approved:  { bg: "bg-green-500",  emoji: "✅" },
+  enrollment_rejected:  { bg: "bg-red-500",    emoji: "❌" },
+  new_enrollment:       { bg: "bg-blue-500",   emoji: "📋" },
+  new_review:           { bg: "bg-yellow-500", emoji: "⭐" },
+  review_reminder:      { bg: "bg-orange-500", emoji: "💬" },
+  course_completed:     { bg: "bg-emerald-500",emoji: "🎉" },
+  new_lesson:           { bg: "bg-indigo-500", emoji: "📚" },
+  new_support_ticket:   { bg: "bg-rose-500",   emoji: "🎫" },
+  payment_reported:     { bg: "bg-orange-500", emoji: "💳" },
+  payment_confirmed:    { bg: "bg-green-500",  emoji: "✅" },
+  payment_cancelled:    { bg: "bg-red-500",    emoji: "❌" },
+  new_sale:             { bg: "bg-emerald-500",emoji: "💰" },
+  withdrawal_request:   { bg: "bg-blue-500",   emoji: "📤" },
+  withdrawal_completed: { bg: "bg-green-500",  emoji: "💸" },
+  withdrawal_rejected:  { bg: "bg-red-500",    emoji: "🚫" },
+  default:              { bg: "bg-primary",    emoji: "🔔" },
+};
+const getTypeConfig = (type: string) => typeConfig[type] || typeConfig.default;
 
 const menuItems = [
   { label: "Dashboard",     path: "/admin",               icon: LayoutDashboard },
   { label: "Khóa học",      path: "/admin/courses",       icon: BookOpen },
   { label: "Ghi danh",      path: "/admin/enrollments",   icon: ClipboardList },
+  { label: "Thanh toán",    path: "/admin/payments",      icon: CreditCard },
   { label: "Giảng viên",    path: "/admin/instructors",   icon: GraduationCap },
   { label: "Người dùng",    path: "/admin/users",         icon: Users },
   { label: "Danh mục",      path: "/admin/categories",    icon: Tag },
 ];
 
 const pageTitles: Record<string, string> = {
-  "/admin":                 "Dashboard",
-  "/admin/courses":         "Quản lý Khóa học",
-  "/admin/enrollments":     "Quản lý Ghi danh",
-  "/admin/instructors":     "Quản lý Giảng viên",
-  "/admin/users":           "Quản lý Người dùng",
-  "/admin/categories":      "Quản lý Danh mục",
+  "/admin":                    "Dashboard",
+  "/admin/courses":            "Quản lý Khóa học",
+  "/admin/enrollments":        "Quản lý Ghi danh",
+  "/admin/instructors":        "Quản lý Giảng viên",
+  "/admin/users":              "Quản lý Người dùng",
+  "/admin/categories":         "Quản lý Danh mục",
+  "/admin/notifications":      "Thông báo",
+  "/admin/payments":           "Quản lý Thanh toán",
 };
 
+const PREVIEW_LIMIT = 5;
+
 const AdminLayout = () => {
-  const [collapsed, setCollapsed]         = useState(false);
-  const [pendingCount, setPendingCount]   = useState(0);
+  const [collapsed, setCollapsed]     = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [bellOpen, setBellOpen]       = useState(false);
+  const bellRef                       = useRef<HTMLDivElement>(null);
   const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const currentTitle = pageTitles[location.pathname] || "Admin";
 
+  const fetchNotifications = async () => {
+    try {
+      const data = await notificationService.getNotifications();
+      setNotifications(data.notifications);
+      setUnreadCount(data.unread_count);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    api.get('/admin/enrollments')
-      .then(res => {
-        const pending = (res.data.enrollments || []).filter((e: any) => e.status === 'pending');
-        setPendingCount(pending.length);
-      })
-      .catch(() => {});
-  }, [location.pathname]);
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleMarkAllRead = async () => {
+    await notificationService.markAllAsRead();
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setUnreadCount(0);
+  };
+
+  const handleMarkRead = async (id: number) => {
+    await notificationService.markAsRead(id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  };
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -168,26 +223,81 @@ const AdminLayout = () => {
               </Tooltip>
 
               {/* Notification bell */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link to="/admin/enrollments" className="relative">
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
-                      <Bell size={17} />
-                    </Button>
-                    {pendingCount > 0 && (
-                      <Badge
-                        className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center"
-                        style={{ background: "hsl(var(--admin-reject))", color: "#fff", borderRadius: "9999px" }}
+              <div className="relative" ref={bellRef}>
+                <button
+                  onClick={() => setBellOpen(o => !o)}
+                  className="relative inline-flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  <Bell size={17} />
+                  {unreadCount > 0 && (
+                    <Badge
+                      className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center pointer-events-none"
+                      style={{ background: "hsl(var(--admin-reject))", color: "#fff", borderRadius: "9999px" }}
+                    >
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Badge>
+                  )}
+                </button>
+
+                {bellOpen && (
+                  <div className="absolute right-0 top-11 w-96 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
+                      <span className="font-semibold text-sm text-foreground">Thông Báo Mới Nhận</span>
+                      {unreadCount > 0 && (
+                        <button onClick={handleMarkAllRead} className="text-xs text-primary hover:underline font-medium">
+                          Đánh dấu tất cả đã đọc
+                        </button>
+                      )}
+                    </div>
+
+                    {/* List */}
+                    <div className="divide-y divide-border max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <p className="text-center text-muted-foreground text-sm py-10">
+                          Không có thông báo nào
+                        </p>
+                      ) : (
+                        notifications.slice(0, PREVIEW_LIMIT).map(n => {
+                          const cfg = getTypeConfig(n.type);
+                          return (
+                            <div
+                              key={n.id}
+                              onClick={() => !n.is_read && handleMarkRead(n.id)}
+                              className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${!n.is_read ? "bg-primary/5" : ""}`}
+                            >
+                              <div className={`${cfg.bg} w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center text-xl`}>
+                                {cfg.emoji}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-semibold line-clamp-1 ${!n.is_read ? "text-foreground" : "text-muted-foreground"}`}>
+                                  {n.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                                <p className="text-[10px] text-muted-foreground/60 mt-1">
+                                  {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: vi })}
+                                </p>
+                              </div>
+                              {!n.is_read && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="border-t border-border">
+                      <Link
+                        to="/admin/notifications"
+                        onClick={() => setBellOpen(false)}
+                        className="block w-full text-center text-sm font-medium text-foreground py-3 hover:bg-muted/50 transition-colors"
                       >
-                        {pendingCount > 99 ? "99+" : pendingCount}
-                      </Badge>
-                    )}
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {pendingCount > 0 ? `${pendingCount} ghi danh chờ duyệt` : "Không có thông báo mới"}
-                </TooltipContent>
-              </Tooltip>
+                        Xem tất cả
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* User menu */}
               <DropdownMenu>

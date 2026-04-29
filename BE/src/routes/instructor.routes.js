@@ -3,6 +3,7 @@ const router = express.Router();
 const authenticateToken = require('../middleware/auth');
 const checkRole = require('../middleware/checkRole');
 const instructorController = require('../controllers/instructorController');
+const withdrawalController = require('../controllers/withdrawalController');
 
 /**
  * Instructor Routes
@@ -89,6 +90,22 @@ router.delete('/questions/:questionId',
   authenticateToken,
   checkRole(['instructor', 'admin']),
   instructorController.deleteQuizQuestion
+);
+
+// ==================== BANK ACCOUNT ====================
+router.get('/bank-account', authenticateToken, checkRole(['instructor', 'admin']), withdrawalController.getBankAccount);
+router.post('/bank-account', authenticateToken, checkRole(['instructor', 'admin']), withdrawalController.saveBankAccount);
+router.delete('/bank-account', authenticateToken, checkRole(['instructor', 'admin']), withdrawalController.deleteBankAccount);
+
+// ==================== WITHDRAWALS ====================
+router.get('/withdrawals', authenticateToken, checkRole(['instructor', 'admin']), withdrawalController.getWithdrawals);
+router.post('/withdrawals', authenticateToken, checkRole(['instructor', 'admin']), withdrawalController.createWithdrawal);
+
+// ==================== EARNINGS ====================
+router.get('/earnings',
+  authenticateToken,
+  checkRole(['instructor', 'admin']),
+  instructorController.getEarnings
 );
 
 // ==================== MY ENROLLMENTS ====================

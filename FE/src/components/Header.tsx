@@ -3,7 +3,7 @@ import { useState } from "react";
 import {
   Menu, X, LogOut, GraduationCap, BookOpen,
   Moon, Sun, Search, ChevronDown,
-  UserCircle, Heart, Award, Receipt, Settings, HelpCircle,
+  UserCircle, Heart, Award, Receipt, Settings, HelpCircle, ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,8 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
+import { useCart } from "@/context/CartContext";
+import NotificationBell from "@/components/NotificationBell";
 
 const studentNavItems = [
   { label: "Trang chủ", path: "/" },
@@ -53,6 +55,7 @@ const Header = () => {
   const { user, isAuthenticated, logout, activeMode, setActiveMode } = useAuth();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const { count: cartCount } = useCart();
 
   const isInstructor = user?.roles?.includes("instructor");
   const navItems = activeMode === "instructor" ? instructorNavItems : studentNavItems;
@@ -136,7 +139,7 @@ const Header = () => {
             </form>
           </div>
 
-          {/* Col 3 — Theme + User */}
+          {/* Col 3 — Theme + Notifications + User */}
           <div className="flex items-center gap-2 justify-end">
             <Button
               variant="ghost"
@@ -146,6 +149,19 @@ const Header = () => {
             >
               {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
             </Button>
+
+            <NotificationBell />
+
+            {isAuthenticated && activeMode === 'student' && (
+              <Link to="/cart" className="relative inline-flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:text-primary hover:bg-accent transition-colors">
+                <ShoppingCart size={18} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none pointer-events-none">
+                    {cartCount > 9 ? '9+' : cartCount}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {isAuthenticated ? (
               <DropdownMenu>
@@ -241,10 +257,11 @@ const Header = () => {
                   <ComingSoon />
                 </DropdownMenuItem>
 
-                <DropdownMenuItem onClick={() => showComingSoon("Trợ giúp & Hỗ trợ")} className="flex items-center gap-2 cursor-pointer">
-                  <HelpCircle size={15} className="text-muted-foreground" />
-                  Trợ giúp & Hỗ trợ
-                  <ComingSoon />
+                <DropdownMenuItem asChild>
+                  <Link to="/support" className="flex items-center gap-2 cursor-pointer">
+                    <HelpCircle size={15} className="text-muted-foreground" />
+                    Trợ giúp & Hỗ trợ
+                  </Link>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
@@ -380,10 +397,9 @@ const Header = () => {
                   <Settings size={15} /> Cài đặt tài khoản
                   <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-muted">Sắp có</span>
                 </button>
-                <button onClick={() => { showComingSoon("Trợ giúp & Hỗ trợ"); setMobileOpen(false); }} className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent text-left">
+                <Link to="/support" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent">
                   <HelpCircle size={15} /> Trợ giúp & Hỗ trợ
-                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-muted">Sắp có</span>
-                </button>
+                </Link>
 
                 {/* Group 5 */}
                 <div className="border-t my-1" />

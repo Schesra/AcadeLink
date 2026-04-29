@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { courseService } from "@/services/courseService";
 import { useToast } from "@/hooks/use-toast";
+import SupportTicketModal from "@/components/SupportTicketModal";
 
 type LessonType = "text" | "video" | "quiz";
 
@@ -179,9 +180,7 @@ const LearnCourse = () => {
   const [loading, setLoading] = useState(true);
   const [currentLessonId, setCurrentLessonId] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [completedLessons, setCompletedLessons] = useState<Set<string>>(() =>
-    getCompletedLessons(id || "")
-  );
+  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!id) return;
@@ -203,7 +202,19 @@ const LearnCourse = () => {
       setCourse(courseData.course);
       setLessons(fetchedLessons);
       if (fetchedLessons.length > 0) setCurrentLessonId(String(fetchedLessons[0].id));
-      setCompletedLessons(getCompletedLessons(id!));
+
+      // Load progress từ backend, fallback về localStorage
+      try {
+        const progressData = await courseService.getCourseProgress(id!);
+        const backendIds = new Set<string>((progressData.completed_lesson_ids || []).map(String));
+        // Merge với localStorage để không mất data cũ
+        const localIds = getCompletedLessons(id!);
+        const merged = new Set([...backendIds, ...localIds]);
+        setCompletedLessons(merged);
+        saveCompletedLessons(id!, merged);
+      } catch {
+        setCompletedLessons(getCompletedLessons(id!));
+      }
     } catch (error: any) {
       const status = error.response?.status;
       if (status === 403) {
@@ -237,14 +248,20 @@ const LearnCourse = () => {
       saveCompletedLessons(id, next);
       return next;
     });
+    courseService.completeLesson(Number(currentLessonId)).catch(() => {});
   }, [currentLessonId, id]);
 
   const toggleComplete = useCallback(() => {
     if (!currentLessonId || !id) return;
     setCompletedLessons((prev) => {
       const next = new Set(prev);
-      if (next.has(currentLessonId)) next.delete(currentLessonId);
-      else next.add(currentLessonId);
+      if (next.has(currentLessonId)) {
+        next.delete(currentLessonId);
+        courseService.uncompleteLesson(Number(currentLessonId)).catch(() => {});
+      } else {
+        next.add(currentLessonId);
+        courseService.completeLesson(Number(currentLessonId)).catch(() => {});
+      }
       saveCompletedLessons(id, next);
       return next;
     });
@@ -339,6 +356,7 @@ const LearnCourse = () => {
             <h3 className="text-sm font-semibold truncate">{currentLesson?.title}</h3>
           </div>
           <div className="text-xs text-[hsl(210,20%,50%)] shrink-0">{progressPct}% hoàn thành</div>
+          <SupportTicketModal courseId={course.id} courseTitle={course.title} />
         </div>
 
         {/* Video lesson */}

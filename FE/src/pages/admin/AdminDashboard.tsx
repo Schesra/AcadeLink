@@ -1,8 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   BookOpen, Users, ClipboardList, Tag,
   Clock, CheckCircle2, XCircle, Plus, ChevronDown, TrendingUp,
+  Wallet, ArrowDownLeft, Building2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,12 @@ import {
   Tooltip, ResponsiveContainer,
 } from "recharts";
 import api from "@/services/api";
+import { paymentService, AdminBalance } from "@/services/paymentService";
+import { withdrawalService, BankAccount } from "@/services/withdrawalService";
+import { useToast } from "@/hooks/use-toast";
+import { LinkBankDialog } from "@/components/instructor/WithdrawDialogs";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DateRange = "today" | "7days" | "month" | "all";
@@ -153,8 +160,105 @@ const ChartTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+// ─── Admin Withdraw Dialog ────────────────────────────────────────────────────
+interface AdminWithdrawDialogProps {
+  availableBalance: number;
+  bankAccount: BankAccount;
+  onSuccess: () => void;
+  onClose: () => void;
+}
+
+const AdminWithdrawDialog = ({ availableBalance, bankAccount, onSuccess, onClose }: AdminWithdrawDialogProps) => {
+  const { toast } = useToast();
+  const [amount, setAmount] = useState("");
+  const [amountDisplay, setAmountDisplay] = useState("");
+  const [processing, setProcessing] = useState(false);
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\./g, "").replace(/\D/g, "");
+    setAmount(raw);
+    setAmountDisplay(raw ? Number(raw).toLocaleString("vi-VN") : "");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = Number(amount);
+    if (!n || n <= 0) return;
+    if (n < 50000) {
+      toast({ title: "Số tiền tối thiểu 50.000₫", variant: "destructive" });
+      return;
+    }
+    if (n > availableBalance) {
+      toast({ title: "Số dư không đủ", variant: "destructive" });
+      return;
+    }
+    setProcessing(true);
+    try {
+      await paymentService.adminCreateWithdrawal(n);
+      toast({ title: "Rút tiền thành công!", description: fmtMoney(n) + " đã được ghi nhận." });
+      onSuccess();
+    } catch (err: any) {
+      toast({ title: "Lỗi", description: err.response?.data?.message || "Rút tiền thất bại", variant: "destructive" });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="p-6 border-b border-border flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+            <ArrowDownLeft size={20} className="text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Rút tiền về tài khoản</h2>
+            <p className="text-sm text-muted-foreground">Số dư khả dụng: <span className="font-semibold text-emerald-600">{fmtMoney(availableBalance)}</span></p>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="rounded-lg bg-muted/50 border px-4 py-3 text-sm space-y-1">
+            <p className="text-muted-foreground">Chuyển đến</p>
+            <p className="font-semibold">{bankAccount.account_name}</p>
+            <p className="text-muted-foreground">{bankAccount.bank_name} — {bankAccount.bank_account}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Số tiền rút *</label>
+            <div className="relative">
+              <Wallet size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={amountDisplay}
+                onChange={handleAmountChange}
+                placeholder="Nhập số tiền"
+                className="w-full border border-input rounded-md pl-9 pr-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                required
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Tối thiểu 50.000₫</p>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 border border-input rounded-md py-2 text-sm font-medium hover:bg-muted transition-colors">
+              Hủy
+            </button>
+            <button type="submit" disabled={processing}
+              className="flex-1 bg-emerald-600 text-white rounded-md py-2 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+              {processing ? "Đang xử lý..." : "Xác nhận rút tiền"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
+const fmtMoney = (n: number) => Number(n).toLocaleString("vi-VN") + "₫";
+
 const AdminDashboard = () => {
+  const { toast } = useToast();
   const [loading, setLoading]               = useState(true);
   const [range, setRange]                   = useState<DateRange>("7days");
   const [allEnrollments, setAllEnrollments] = useState<any[]>([]);
@@ -163,12 +267,30 @@ const AdminDashboard = () => {
   const [totalCategories, setTotalCategories] = useState(0);
   const [categoryStats, setCategoryStats]   = useState<{ name: string; count: number }[]>([]);
 
+  // Balance state
+  const [balance, setBalance]             = useState<AdminBalance | null>(null);
+  const [bankAccount, setBankAccount]     = useState<BankAccount | null>(null);
+  const [showLinkBank, setShowLinkBank]   = useState(false);
+  const [showWithdraw, setShowWithdraw]   = useState(false);
+
+  const fetchBalance = useCallback(async () => {
+    try {
+      const [balData, bankData] = await Promise.all([
+        paymentService.adminGetBalance(),
+        withdrawalService.getBankAccount(),
+      ]);
+      setBalance(balData);
+      setBankAccount(bankData.bank_account);
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     Promise.all([
       api.get('/admin/courses'),
       api.get('/admin/enrollments'),
       api.get('/admin/categories'),
       api.get('/admin/users'),
+      fetchBalance(),
     ]).then(([c, e, cat, u]) => {
       const enrollments: any[] = e.data.enrollments || [];
       const courses: any[]     = c.data.courses     || [];
@@ -190,7 +312,7 @@ const AdminDashboard = () => {
           .sort((a, b) => b.count - a.count)
       );
     }).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  }, [fetchBalance]);
 
   const filteredEnrollments = useMemo(
     () => allEnrollments.filter(e => isInRange(e.enrolled_at, range)),
@@ -274,6 +396,104 @@ const AdminDashboard = () => {
           </Card>
         ))}
       </div>
+
+      {/* ── Admin Balance ── */}
+      {balance && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Available balance card */}
+          <Card className="border-0 shadow-sm overflow-hidden lg:col-span-1">
+            <div className="h-1 w-full bg-emerald-500" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Số dư nền tảng</CardTitle>
+              <div className="p-1.5 rounded-md bg-emerald-500/10">
+                <Wallet size={16} className="text-emerald-600" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-1 pb-3 space-y-3">
+              <p className="text-3xl font-extrabold tracking-tight text-emerald-600">
+                {fmtMoney(balance.available_balance)}
+              </p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div className="flex justify-between">
+                  <span>Tổng doanh thu</span>
+                  <span className="font-medium text-foreground">{fmtMoney(balance.total_platform_revenue)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Đã rút</span>
+                  <span className="font-medium text-foreground">{fmtMoney(balance.total_withdrawn)}</span>
+                </div>
+              </div>
+              <Button size="sm" className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => {
+                  if (!bankAccount) setShowLinkBank(true);
+                  else setShowWithdraw(true);
+                }}>
+                <ArrowDownLeft size={14} /> Rút tiền
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Bank account card */}
+          <Card className="border-0 shadow-sm overflow-hidden">
+            <div className="h-1 w-full bg-blue-500" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Tài khoản ngân hàng</CardTitle>
+              <div className="p-1.5 rounded-md bg-blue-500/10">
+                <Building2 size={16} className="text-blue-600" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-1 pb-3">
+              {bankAccount ? (
+                <div className="space-y-2">
+                  <p className="text-base font-bold">{bankAccount.account_name}</p>
+                  <p className="text-sm text-muted-foreground">{bankAccount.bank_name}</p>
+                  <p className="text-sm font-mono tracking-wide">{bankAccount.bank_account}</p>
+                  <button
+                    onClick={() => setShowLinkBank(true)}
+                    className="text-xs text-blue-600 hover:underline mt-1"
+                  >
+                    Thay đổi tài khoản
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Chưa liên kết tài khoản ngân hàng</p>
+                  <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowLinkBank(true)}>
+                    <Building2 size={14} /> Liên kết ngay
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Withdrawal history */}
+          <Card className="border-0 shadow-sm overflow-hidden">
+            <div className="h-1 w-full bg-violet-500" />
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Lịch sử rút tiền</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {balance.withdrawal_history.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-4 pb-4">Chưa có lần rút nào</p>
+              ) : (
+                <div className="divide-y">
+                  {balance.withdrawal_history.slice(0, 5).map((w) => (
+                    <div key={w.id} className="flex items-center justify-between px-4 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{fmtMoney(w.amount)}</p>
+                        <p className="text-xs text-muted-foreground truncate">{w.bank_name} — {w.bank_account}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground shrink-0 ml-2">
+                        {formatDistanceToNow(new Date(w.created_at), { addSuffix: true, locale: vi })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* ── Chart + Recent ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -393,6 +613,22 @@ const AdminDashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Dialogs ── */}
+      {showLinkBank && (
+        <LinkBankDialog
+          onSuccess={(bank) => { setBankAccount(bank); setShowLinkBank(false); }}
+          onClose={() => setShowLinkBank(false)}
+        />
+      )}
+      {showWithdraw && bankAccount && balance && (
+        <AdminWithdrawDialog
+          availableBalance={balance.available_balance}
+          bankAccount={bankAccount}
+          onSuccess={() => { setShowWithdraw(false); fetchBalance(); }}
+          onClose={() => setShowWithdraw(false)}
+        />
+      )}
 
     </div>
   );

@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Check, X } from "lucide-react";
 import api from "@/services/api";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -120,13 +121,13 @@ const InstructorEnrollments = () => {
                     <td className="px-4 py-3 text-right">
                       {e.status === 'pending' && (
                         <div className="flex items-center justify-end gap-2">
-                          <Button size="sm" className="bg-success hover:bg-success/90 text-success-foreground"
-                            onClick={() => handleAction(e.id, 'approve')}>
-                            Duyệt
+                          <Button size="icon" className="h-8 w-8 bg-success hover:bg-success/90 text-success-foreground"
+                            title="Duyệt" onClick={() => handleAction(e.id, 'approve')}>
+                            <Check size={16} />
                           </Button>
-                          <Button size="sm" variant="outline" className="text-destructive hover:text-destructive"
-                            onClick={() => handleAction(e.id, 'reject')}>
-                            Từ chối
+                          <Button size="icon" variant="outline" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            title="Từ chối" onClick={() => handleAction(e.id, 'reject')}>
+                            <X size={16} />
                           </Button>
                         </div>
                       )}
