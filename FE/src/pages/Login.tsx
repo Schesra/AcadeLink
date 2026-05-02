@@ -31,8 +31,8 @@ const Login = () => {
     try {
       const response = await authService.login({ username, password });
 
-      if (response.token && response.user) {
-        login(response.token, response.user);
+      if (response.accessToken && response.user) {
+        login(response.accessToken, response.user, response.refreshToken);
         toast({
           title: "Thành công",
           description: "Đăng nhập thành công!",

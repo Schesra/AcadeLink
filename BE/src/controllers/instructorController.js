@@ -45,6 +45,7 @@ const becomeInstructor = async (req, res) => {
 /**
  * Lấy khóa học của tôi
  * GET /api/instructor/courses
+ * FIX: Thay correlated subquery bằng LEFT JOIN aggregate để tránh N*2 subqueries
  */
 const getMyCourses = async (req, res) => {
   try {
@@ -60,10 +61,21 @@ const getMyCourses = async (req, res) => {
         c.created_at,
         c.updated_at,
         cat.category_name,
-        (SELECT COUNT(*) FROM lessons WHERE course_id = c.id) as lesson_count,
-        (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id AND status = 'approved') as student_count
+        COALESCE(lc.lesson_count, 0) as lesson_count,
+        COALESCE(ec.student_count, 0) as student_count
       FROM courses c
       JOIN categories cat ON c.category_id = cat.id
+      LEFT JOIN (
+        SELECT course_id, COUNT(*) as lesson_count
+        FROM lessons
+        GROUP BY course_id
+      ) lc ON lc.course_id = c.id
+      LEFT JOIN (
+        SELECT course_id, COUNT(*) as student_count
+        FROM enrollments
+        WHERE status = 'approved'
+        GROUP BY course_id
+      ) ec ON ec.course_id = c.id
       WHERE c.instructor_id = ?
       ORDER BY c.created_at DESC
     `, [instructor_id]);
@@ -293,21 +305,24 @@ const createLesson = async (req, res) => {
     const lessonId = result.insertId;
 
     // Notify tất cả học viên đã được duyệt vào khóa học
+    // FIX: Dùng bulk INSERT thay vì loop N lần để tránh N+1 async calls
     const [[courseInfo]] = await db.query('SELECT title FROM courses WHERE id = ?', [course_id]);
     const [enrolledStudents] = await db.query(
       'SELECT user_id FROM enrollments WHERE course_id = ? AND status = ?',
       [course_id, 'approved']
     );
-    if (courseInfo) {
-      for (const s of enrolledStudents) {
-        await createNotification(
-          s.user_id,
-          'new_lesson',
-          'Khóa học có bài học mới 📚',
-          `Khóa học "${courseInfo.title}" vừa được bổ sung bài học mới: "${title}". Vào học ngay nhé!`,
-          Number(course_id)
-        );
-      }
+    if (courseInfo && enrolledStudents.length > 0) {
+      const notifValues = enrolledStudents.map(s => [
+        s.user_id,
+        'new_lesson',
+        'Khóa học có bài học mới 📚',
+        `Khóa học "${courseInfo.title}" vừa được bổ sung bài học mới: "${title}". Vào học ngay nhé!`,
+        Number(course_id)
+      ]);
+      await db.query(
+        'INSERT INTO notifications (user_id, type, title, message, related_id) VALUES ?',
+        [notifValues]
+      );
     }
 
     res.status(201).json({

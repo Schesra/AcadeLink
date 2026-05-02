@@ -31,64 +31,62 @@ const enrollCourse = async (req, res) => {
       });
     }
 
-    // Kiểm tra đã đăng ký chưa
-    const [existingEnrollments] = await db.query(
-      'SELECT id, status FROM enrollments WHERE user_id = ? AND course_id = ?',
-      [user_id, course_id]
-    );
-
-    if (existingEnrollments.length > 0) {
-      const status = existingEnrollments[0].status;
-      let message = 'Bạn đã đăng ký khóa học này rồi';
-      
-      if (status === 'pending') {
-        message = 'Yêu cầu đăng ký của bạn đang chờ duyệt';
-      } else if (status === 'approved') {
-        message = 'Bạn đã được duyệt vào khóa học này';
-      } else if (status === 'rejected') {
-        message = 'Yêu cầu đăng ký của bạn đã bị từ chối';
-      }
-
-      return res.status(409).json({ 
-        error: 'Already enrolled',
-        message 
-      });
-    }
-
-    // Tạo enrollment mới với status = pending
-    const [result] = await db.query(
-      'INSERT INTO enrollments (user_id, course_id, status, enrolled_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
+    // FIX: Dùng INSERT IGNORE + UNIQUE KEY (user_id, course_id) để tránh race condition.
+    // Nếu đã tồn tại, INSERT IGNORE bỏ qua mà không throw error.
+    // Sau đó SELECT để lấy trạng thái thực tế và trả về message phù hợp.
+    const [insertResult] = await db.query(
+      'INSERT IGNORE INTO enrollments (user_id, course_id, status, enrolled_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
       [user_id, course_id, 'pending']
     );
 
+    // affectedRows = 0 nghĩa là đã tồn tại (bị IGNORE)
+    if (insertResult.affectedRows === 0) {
+      const [existingEnrollments] = await db.query(
+        'SELECT id, status FROM enrollments WHERE user_id = ? AND course_id = ?',
+        [user_id, course_id]
+      );
+      const status = existingEnrollments[0]?.status;
+      let message = 'Bạn đã đăng ký khóa học này rồi';
+      if (status === 'pending') message = 'Yêu cầu đăng ký của bạn đang chờ duyệt';
+      else if (status === 'approved') message = 'Bạn đã được duyệt vào khóa học này';
+      else if (status === 'rejected') message = 'Yêu cầu đăng ký của bạn đã bị từ chối';
+      return res.status(409).json({ error: 'Already enrolled', message });
+    }
+
     const courseTitle = courses[0].title;
-    const enrollmentId = result.insertId;
+    const enrollmentId = insertResult.insertId;
 
     // Lấy tên học viên
     const [[student]] = await db.query('SELECT full_name, username FROM users WHERE id = ?', [user_id]);
     const studentName = student?.full_name || student?.username || 'Học viên';
 
-    // Notify instructor
+    // FIX: Gom notify instructor + tất cả admin vào một bulk INSERT thay vì loop
     const [[course]] = await db.query('SELECT instructor_id FROM courses WHERE id = ?', [course_id]);
+    const [admins] = await db.query('SELECT user_id FROM user_roles WHERE role = ?', ['admin']);
+
+    const notifRecipients = [];
     if (course) {
-      await createNotification(
+      notifRecipients.push([
         course.instructor_id,
         'new_enrollment',
         'Có học viên mới đăng ký',
         `${studentName} vừa đăng ký khóa học "${courseTitle}". Hãy xem xét và duyệt yêu cầu.`,
         enrollmentId
-      );
+      ]);
     }
-
-    // Notify tất cả admin
-    const [admins] = await db.query('SELECT user_id FROM user_roles WHERE role = ?', ['admin']);
     for (const admin of admins) {
-      await createNotification(
+      notifRecipients.push([
         admin.user_id,
         'new_enrollment',
         'Yêu cầu ghi danh mới',
         `${studentName} vừa đăng ký khóa học "${courseTitle}" và đang chờ duyệt.`,
         enrollmentId
+      ]);
+    }
+    if (notifRecipients.length > 0) {
+      await db.query(
+        'INSERT INTO notifications (user_id, type, title, message, related_id) VALUES ?',
+        [notifRecipients]
       );
     }
 

@@ -621,9 +621,27 @@ const deleteUser = async (req, res) => {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
-      await conn.query('DELETE FROM user_roles WHERE user_id = ?', [id]);
+
+      // Xóa lessons thuộc các khóa học của user (nếu là instructor)
+      await conn.query(
+        'DELETE l FROM lessons l JOIN courses c ON l.course_id = c.id WHERE c.instructor_id = ?',
+        [id]
+      );
+      // Xóa enrollments của học viên trong các khóa học của user (nếu là instructor)
+      await conn.query(
+        'DELETE e FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE c.instructor_id = ?',
+        [id]
+      );
+      // Xóa các khóa học của user (nếu là instructor)
+      await conn.query('DELETE FROM courses WHERE instructor_id = ?', [id]);
+
+      // Xóa enrollments của chính user (với tư cách học viên)
       await conn.query('DELETE FROM enrollments WHERE user_id = ?', [id]);
+      // Xóa roles
+      await conn.query('DELETE FROM user_roles WHERE user_id = ?', [id]);
+      // Xóa user
       await conn.query('DELETE FROM users WHERE id = ?', [id]);
+
       await conn.commit();
     } catch (innerError) {
       await conn.rollback();

@@ -113,6 +113,7 @@ const register = async (req, res) => {
 /**
  * Đăng nhập (Student/Instructor)
  * POST /api/auth/login
+ * FIX: Implement đúng Access Token (15m) + Refresh Token (7d) lưu DB
  */
 const login = async (req, res) => {
   try {
@@ -156,23 +157,34 @@ const login = async (req, res) => {
       'SELECT role FROM user_roles WHERE user_id = ?',
       [user.id]
     );
-
     const roles = userRoles.map(row => row.role);
 
-    // Tạo JWT token
-    const token = jwt.sign(
-      {
-        user_id: user.id,
-        email: user.email,
-        roles: roles
-      },
+    // Tạo Access Token ngắn hạn (15 phút)
+    const accessToken = jwt.sign(
+      { user_id: user.id, email: user.email, roles },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { expiresIn: '15m' }
+    );
+
+    // Tạo Refresh Token dài hạn (7 ngày)
+    const refreshToken = jwt.sign(
+      { user_id: user.id },
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
+      { expiresIn: '7d' }
+    );
+
+    // Lưu Refresh Token vào DB (xóa token cũ của user trước)
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await db.query('DELETE FROM refresh_tokens WHERE user_id = ?', [user.id]);
+    await db.query(
+      'INSERT INTO refresh_tokens (user_id, token, expires_at, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+      [user.id, refreshToken, expiresAt]
     );
 
     res.json({
       message: 'Đăng nhập thành công',
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -194,6 +206,7 @@ const login = async (req, res) => {
 /**
  * Đăng nhập Admin
  * POST /api/admin/login
+ * FIX: Implement đúng Access Token (15m) + Refresh Token (7d) lưu DB
  */
 const adminLogin = async (req, res) => {
   try {
@@ -237,7 +250,6 @@ const adminLogin = async (req, res) => {
       'SELECT role FROM user_roles WHERE user_id = ?',
       [user.id]
     );
-
     const roles = userRoles.map(row => row.role);
 
     // Kiểm tra có role admin không
@@ -248,20 +260,32 @@ const adminLogin = async (req, res) => {
       });
     }
 
-    // Tạo JWT token
-    const token = jwt.sign(
-      {
-        user_id: user.id,
-        email: user.email,
-        roles: roles
-      },
+    // Tạo Access Token ngắn hạn (15 phút)
+    const accessToken = jwt.sign(
+      { user_id: user.id, email: user.email, roles },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { expiresIn: '15m' }
+    );
+
+    // Tạo Refresh Token dài hạn (7 ngày)
+    const refreshToken = jwt.sign(
+      { user_id: user.id },
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
+      { expiresIn: '7d' }
+    );
+
+    // Lưu Refresh Token vào DB
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await db.query('DELETE FROM refresh_tokens WHERE user_id = ?', [user.id]);
+    await db.query(
+      'INSERT INTO refresh_tokens (user_id, token, expires_at, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+      [user.id, refreshToken, expiresAt]
     );
 
     res.json({
       message: 'Đăng nhập Admin thành công',
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -281,17 +305,50 @@ const adminLogin = async (req, res) => {
 };
 
 /**
- * Refresh token với roles mới nhất
+ * Đổi Refresh Token lấy Access Token mới (với roles mới nhất từ DB)
  * POST /api/auth/refresh-token
+ * Body: { refreshToken }
+ * FIX: Không cần authenticateToken middleware — verify bằng refresh secret riêng,
+ *      kiểm tra token còn trong DB, cấp Access Token mới với roles cập nhật.
  */
 const refreshToken = async (req, res) => {
   try {
-    const user_id = req.user.user_id;
+    const { refreshToken: token } = req.body;
 
-    // Lấy thông tin user mới nhất
+    if (!token) {
+      return res.status(400).json({ message: 'Refresh token là bắt buộc' });
+    }
+
+    // Verify refresh token
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh'
+      );
+    } catch (err) {
+      return res.status(401).json({ message: 'Refresh token không hợp lệ hoặc đã hết hạn' });
+    }
+
+    // Kiểm tra token còn trong DB không (chưa bị logout/thu hồi)
+    const [tokens] = await db.query(
+      'SELECT id, expires_at FROM refresh_tokens WHERE user_id = ? AND token = ?',
+      [decoded.user_id, token]
+    );
+
+    if (tokens.length === 0) {
+      return res.status(401).json({ message: 'Refresh token đã bị thu hồi. Vui lòng đăng nhập lại.' });
+    }
+
+    if (new Date() > new Date(tokens[0].expires_at)) {
+      await db.query('DELETE FROM refresh_tokens WHERE id = ?', [tokens[0].id]);
+      return res.status(401).json({ message: 'Refresh token đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+
+    // Lấy thông tin user và roles MỚI NHẤT từ DB
     const [users] = await db.query(
       'SELECT id, username, email, full_name FROM users WHERE id = ?',
-      [user_id]
+      [decoded.user_id]
     );
 
     if (users.length === 0) {
@@ -299,23 +356,21 @@ const refreshToken = async (req, res) => {
     }
 
     const user = users[0];
-
-    // Lấy roles mới nhất
     const [userRoles] = await db.query(
       'SELECT role FROM user_roles WHERE user_id = ?',
-      [user_id]
+      [decoded.user_id]
     );
     const roles = userRoles.map(r => r.role);
 
-    // Issue token mới
-    const token = jwt.sign(
+    // Cấp Access Token mới (15 phút) với roles cập nhật
+    const accessToken = jwt.sign(
       { user_id: user.id, email: user.email, roles },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { expiresIn: '15m' }
     );
 
     res.json({
-      token,
+      accessToken,
       user: {
         id: user.id,
         username: user.username,
@@ -326,6 +381,29 @@ const refreshToken = async (req, res) => {
     });
   } catch (error) {
     console.error('Refresh token error:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi' });
+  }
+};
+
+/**
+ * Đăng xuất — xóa refresh token khỏi DB
+ * POST /api/auth/logout
+ * Body: { refreshToken }
+ */
+const logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ message: 'Refresh token là bắt buộc' });
+    }
+
+    // Xóa refresh token khỏi DB
+    await db.query('DELETE FROM refresh_tokens WHERE token = ?', [refreshToken]);
+
+    res.json({ message: 'Đăng xuất thành công' });
+  } catch (error) {
+    console.error('Logout error:', error);
     res.status(500).json({ message: 'Đã xảy ra lỗi' });
   }
 };
@@ -478,6 +556,7 @@ module.exports = {
   login,
   adminLogin,
   refreshToken,
+  logout,
   forgotPassword,
   resetPassword,
   verifyResetToken

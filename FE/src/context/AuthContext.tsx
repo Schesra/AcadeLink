@@ -14,7 +14,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   activeMode: 'student' | 'instructor';
   setActiveMode: (mode: 'student' | 'instructor') => void;
-  login: (token: string, user: User) => void;
+  login: (token: string, user: User, refreshToken?: string) => void;
   updateUser: (partial: Partial<User>) => void;
   logout: () => void;
   loading: boolean;
@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
-    const token = sessionStorage.getItem('token');
+    const token = sessionStorage.getItem('accessToken');
     const savedUser = sessionStorage.getItem('user');
     const savedMode = localStorage.getItem('activeMode') as 'student' | 'instructor' | null;
 
@@ -41,7 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setActiveModeState(savedMode);
         }
       } catch {
-        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('accessToken');
+        sessionStorage.removeItem('refreshToken');
         sessionStorage.removeItem('user');
       }
     }
@@ -50,12 +51,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const handleExpired = () => setSessionExpired(true);
+    // Lắng nghe khi refresh token cập nhật roles mới (ví dụ sau khi becomeInstructor)
+    const handleUserUpdated = (e: Event) => {
+      const updated = (e as CustomEvent).detail;
+      if (updated) {
+        setUser(updated);
+        sessionStorage.setItem('user', JSON.stringify(updated));
+      }
+    };
     window.addEventListener('session-expired', handleExpired);
-    return () => window.removeEventListener('session-expired', handleExpired);
+    window.addEventListener('user-updated', handleUserUpdated);
+    return () => {
+      window.removeEventListener('session-expired', handleExpired);
+      window.removeEventListener('user-updated', handleUserUpdated);
+    };
   }, []);
 
-  const login = (token: string, userData: User) => {
-    sessionStorage.setItem('token', token);
+  const login = (token: string, userData: User, refreshToken?: string) => {
+    sessionStorage.setItem('accessToken', token);
+    if (refreshToken) sessionStorage.setItem('refreshToken', refreshToken);
     sessionStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     setActiveModeState('student');
@@ -71,7 +85,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    sessionStorage.removeItem('token');
+    // Gọi API logout để xóa refresh token khỏi DB (fire-and-forget)
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (refreshToken) {
+      fetch('http://localhost:3000/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      }).catch(() => {});
+    }
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
     sessionStorage.removeItem('user');
     localStorage.removeItem('activeMode');
     setUser(null);

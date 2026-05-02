@@ -39,9 +39,10 @@ const BecomeInstructor = () => {
     try {
       await api.post('/instructor/become');
 
-      // Refresh token để cập nhật roles mới
-      const refreshRes = await api.post('/auth/refresh-token');
-      login(refreshRes.data.token, refreshRes.data.user);
+      // Refresh token để cập nhật roles mới (dùng refreshToken từ sessionStorage)
+      const refreshToken = sessionStorage.getItem('refreshToken');
+      const refreshRes = await api.post('/auth/refresh-token', { refreshToken });
+      login(refreshRes.data.accessToken, refreshRes.data.user, refreshToken || undefined);
 
       setSuccess(true);
       toast({

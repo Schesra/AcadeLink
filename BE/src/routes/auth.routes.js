@@ -14,8 +14,11 @@ router.post('/register', authController.register);
 // POST /api/auth/login - Đăng nhập Student/Instructor
 router.post('/login', authController.login);
 
-// POST /api/auth/refresh-token - Lấy token mới với roles cập nhật
-router.post('/refresh-token', authenticateToken, authController.refreshToken);
+// POST /api/auth/refresh-token - Dùng refresh token lấy access token mới (không cần authenticateToken)
+router.post('/refresh-token', authController.refreshToken);
+
+// POST /api/auth/logout - Đăng xuất, xóa refresh token khỏi DB
+router.post('/logout', authController.logout);
 
 // POST /api/auth/forgot-password - Gửi email đặt lại mật khẩu
 router.post('/forgot-password', authController.forgotPassword);
